@@ -25,7 +25,11 @@ type PullRequest = {
   body: string
   mergeCommit?: { oid: string } | null
   baseRefName?: string
+  headRefName?: string
+  state?: 'OPEN' | 'MERGED' | 'CLOSED'
 }
+
+type Run = { status: string; conclusion: string; event: string; createdAt: string; url: string }
 
 type Issue = { url: string; description: string; state?: string; attachments?: readonly string[] }
 
@@ -37,6 +41,8 @@ type World = {
   issues?: Readonly<Record<string, Issue>>
   linearCalls?: { count: number }
   compare?: Readonly<Record<string, string>>
+  runs?: readonly Run[]
+  now?: number
 }
 
 const ran = (exitCode: number, stdout: string) => ({
@@ -47,7 +53,7 @@ const linkRow = (url: string) =>
   `{"type":"pr-link","sessionId":"s1","prNumber":${url.split('/').pop()},"prUrl":"${url}","prRepository":"acme/app"}`
 
 const start = async ($: Engine, on: On, world: World) => {
-  const clock = mock.clock(on)
+  const clock = mock.clock(on, world.now === undefined ? undefined : { now: world.now })
 
   mock.env(on, { HOME: '/home/me' })
   on('session.id', () => ({ value: 's1' }))
@@ -69,6 +75,10 @@ const start = async ($: Engine, on: On, world: World) => {
       return rows.length === 0 ? ran(1, '') : ran(0, `${rows.join('\n')}\n`)
     }
 
+    if (args[0] === 'run') {
+      return ran(0, JSON.stringify(world.runs ?? []))
+    }
+
     if (args[0] === 'api') {
       const branch = String(args[1]).split('...').pop() ?? ''
       const status = world.compare?.[branch]
@@ -82,7 +92,17 @@ const start = async ($: Engine, on: On, world: World) => {
         ? world.branchPullRequest
         : world.pullRequests?.find(candidate => candidate.url === url)
 
-    return pullRequest === undefined ? ran(1, '') : ran(0, JSON.stringify(pullRequest))
+    return pullRequest === undefined
+      ? ran(1, '')
+      : ran(
+          0,
+          JSON.stringify({
+            number: Number(pullRequest.url.split('/').pop()),
+            state: pullRequest.mergeCommit ? 'MERGED' : 'OPEN',
+            headRefName: 'feature-branch',
+            ...pullRequest,
+          }),
+        )
   })
   on('http.fetch', (_, e) => {
     if (world.linearCalls) {
@@ -355,5 +375,104 @@ test('shows no stage for an open pull request', { options: { workspace: 'acme', 
 
   expect(await ui.find({ type: 'Link', text: /LIQ-88$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /· on / })).toBeUndefined()
+  await ui.unmount()
+})
+
+const PREVIEW_OPTIONS = {
+  workspace: 'acme',
+  previewWorkflow: 'pr-preview.yml',
+  previewLinks: 'Preview=https://pr-{number}.preview.acme.dev, Admin=https://pr-{number}.admin.preview.acme.dev',
+}
+const NOW = Date.parse('2026-11-09T12:00:00Z')
+const OPEN = { url: `${REPO}/3268`, title: 'feat(payments): LIQ-5463: the Buy tab', body: '' }
+const RUN = {
+  status: 'completed',
+  conclusion: 'success',
+  event: 'workflow_dispatch',
+  createdAt: '2026-11-09T11:00:00Z',
+  url: 'https://github.com/acme/app/actions/runs/7',
+}
+
+test('links the preview of an open pull request', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, { branch: null, now: NOW, linked: [OPEN.url], pullRequests: [OPEN], runs: [RUN] })
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+
+    expect((await ui.find({ type: 'Link', text: /Preview$/ }))?.props.href).toBe('https://pr-3268.preview.acme.dev')
+    expect((await ui.find({ type: 'Link', text: /Admin$/ }))?.props.href).toBe('https://pr-3268.admin.preview.acme.dev')
+    await ui.unmount()
+  }
+})
+
+test('says the preview is deploying while its run is going', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...RUN, status: 'in_progress', conclusion: '' }],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const deploying = await ui.find({ type: 'Link', text: /Preview deploying$/ })
+
+  expect(deploying?.props.href).toBe(RUN.url)
+  expect(await ui.find({ type: 'Link', text: /Admin$/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('links the failed run when the preview did not deploy', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...RUN, conclusion: 'failure' }],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Link', text: /Preview failed$/ }))?.props.href).toBe(RUN.url)
+  await ui.unmount()
+})
+
+test('drops a preview older than its lifetime, or torn down', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...RUN, createdAt: '2026-11-07T10:00:00Z' }],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Link', text: /Preview/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Link', text: /LIQ-5463$/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('shows no preview for a merged pull request', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, { branch: null, now: NOW, linked: [MERGED.url], pullRequests: [MERGED], runs: [RUN] })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Link', text: /Preview/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('shows no preview once the newest run is the teardown', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...RUN, event: 'pull_request' }],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Link', text: /Preview/ })).toBeUndefined()
   await ui.unmount()
 })

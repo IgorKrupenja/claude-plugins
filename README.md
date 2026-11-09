@@ -6,7 +6,7 @@ Anthropic.
 | Plugin | What it does |
 | --- | --- |
 | [session-banners](plugins/session-banners) | A macOS banner when a session finishes. One click opens that session. |
-| [linear-link](plugins/linear-link) | The session's Linear ticket with its state and Figma frames, and how far its merged pull request has deployed, in a row above the message box. |
+| [linear-link](plugins/linear-link) | The session's Linear ticket with its state and Figma frames, its pull request's preview and how far it has deployed, in a row above the message box. |
 
 ## Install
 

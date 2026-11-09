@@ -1,7 +1,7 @@
 {
   "name": "linear-link",
-  "version": "0.3.0",
-  "description": "The session's Linear ticket with its state and Figma frames, and how far its merged pull request has deployed, as links above the message box",
+  "version": "0.4.0",
+  "description": "The session's Linear ticket with its state and Figma frames, its pull request's preview and deploy stage, as links above the message box",
   "author": {
     "name": "Igor Krupenja"
   },
@@ -27,6 +27,24 @@
       "title": "Deploy stages",
       "description": "Branches a merged pull request moves through, in order, as branch=label pairs: main=dev, qa=qa, prod=prod shows on dev, on qa or on prod. Empty hides the stage.",
       "default": ""
+    },
+    "previewLinks": {
+      "type": "string",
+      "title": "Preview links",
+      "description": "Links to an open pull request's preview deployment as label=URL pairs, {number} standing for the pull request number: Preview=https://pr-{number}.preview.example.com. Empty hides the preview.",
+      "default": ""
+    },
+    "previewWorkflow": {
+      "type": "string",
+      "title": "Preview workflow",
+      "description": "The GitHub Actions workflow file that deploys a preview, such as pr-preview.yml. Its newest run on the pull request's branch says whether the preview is deploying, failed or ready.",
+      "default": ""
+    },
+    "previewIdleHours": {
+      "type": "number",
+      "title": "Preview lifetime (hours)",
+      "description": "Hours after its last deploy that a preview is torn down; an older preview is not shown.",
+      "default": 48
     }
   }
 }

@@ -1,9 +1,9 @@
 # linear-link
 
 The Claude desktop app shows each session's pull request. This plugin adds what the app can't
-know: the session's Linear ticket, its state, its designs and how far the change has shipped, in
-a `Linear LIQ-123 In Review · Figma · on qa` row above the message box, in every session that
-works on a ticket.
+know: the session's Linear ticket, its state, its designs, the pull request's preview and how
+far the change has shipped, in a `Linear LIQ-123 In Review · Figma · Preview · Admin` row above
+the message box, in every session that works on a ticket.
 
 - **Read from what you already write:** the ticket IDs come from the title of the pull request
   the app shows for the session (`feat(api): LIQ-123: ...`, several IDs work too), then the
@@ -12,6 +12,10 @@ works on a ticket.
 - **The design one click away:** with a Linear API key, every Figma frame the ticket links, in
   its description or as an attachment, gets its own `Figma` link next to the ticket, after the
   ticket's state (`In Review`, `QA`, `Done`).
+- **The preview, live:** while the pull request is open, its preview links show once the
+  newest preview workflow run succeeded, `Preview deploying` links the run while it goes (checked
+  every minute), and `Preview failed` links the run that broke. A preview past its lifetime, or
+  torn down, drops off.
 - **Where it has shipped:** once the pull request merges, `on dev`, `on qa` or `on prod` says the
   furthest deploy branch its merge commit has reached, checked every ten minutes.
 - **The exact ticket page:** the link is the Linear URL the pull request body carries, the
@@ -43,6 +47,11 @@ pipe a JSON object to `claude plugin configure linear-link@igor-plugins --values
   a branch that has no pull request yet when no API key is set.
 - `stages`: the branches a merged pull request moves through, in order, as `branch=label` pairs,
   such as `main=dev, qa=qa, prod=prod`. Empty, the default, hides the deploy stage.
+- `previewWorkflow` and `previewLinks`: the workflow file that deploys a pull request's preview,
+  such as `pr-preview.yml`, and its links as `label=URL` pairs with `{number}` for the pull
+  request number, such as `Preview=https://pr-{number}.preview.example.com`. Both empty, the
+  default, hides the preview.
+- `previewIdleHours`: how long after its last deploy a preview is torn down, 48 by default.
 
 ## Develop
 

@@ -1,12 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Ticket } from '../types'
+import type { Preview, Ticket } from '../types'
 
 const tickets = atom({ plugin: 'linear-link', key: 'tickets' } as const, [], {
   shape: 'tickets-3',
 })
 const stage = atom({ plugin: 'linear-link', key: 'stage' } as const, null)
+const preview = atom({ plugin: 'linear-link', key: 'preview' } as const, null, {
+  shape: 'preview-1',
+})
 
 const TITLE_IDS =
   /^(?:[\w-]+(?:\([^)]*\))?!?:\s*)?([A-Z][A-Z0-9]{0,6}-\d+(?:\s*,\s*[A-Z][A-Z0-9]{0,6}-\d+)*)\s*:/
@@ -21,22 +24,31 @@ const PULL_REQUEST_RECHECK_MS = 5 * 60_000
 const ISSUE_RECHECK_MS = 10 * 60_000
 const STAGE_RECHECK_MS = 10 * 60_000
 const PULL_REQUEST_REPOSITORY = /github\.com\/([^/]+\/[^/]+)\/pull\/\d+/
+const DEPLOYING_RECHECK_MS = 60_000
+const HOUR_MS = 60 * 60_000
 
 type PullRequest = {
   url: string
+  number: number
+  isOpen: boolean
   title: string
   body: string
   mergeCommit: string | null
   baseBranch: string
+  headBranch: string
   checkedAt: number
 }
 type Issue = { url: string | null; state: string | null; figma: string[]; checkedAt: number }
 type Stage = { branch: string; label: string }
+type PreviewLink = { label: string; template: string }
 
 const check = {
   workspace: '',
   linearApiKey: '',
   stages: [] as Stage[],
+  previewLinks: [] as PreviewLink[],
+  previewWorkflow: '',
+  previewIdleMs: 48 * HOUR_MS,
   transcript: null as { sessionId: string; path: string | null } | null,
   pullRequests: new Map<string, PullRequest>(),
   issues: new Map<string, Issue>(),
@@ -116,7 +128,14 @@ const pullRequestOf = async (
   const target = url === null ? [] : [url]
   const json = await outputOf(
     $,
-    ['gh', 'pr', 'view', ...target, '--json', 'url,title,body,mergeCommit,baseRefName'],
+    [
+      'gh',
+      'pr',
+      'view',
+      ...target,
+      '--json',
+      'url,number,state,title,body,mergeCommit,baseRefName,headRefName',
+    ],
     15_000,
   )
 
@@ -133,17 +152,24 @@ const pullRequestOf = async (
 
     const fields = parsed as Record<string, unknown>
 
-    if (typeof fields.url !== 'string' || typeof fields.title !== 'string') {
+    if (
+      typeof fields.url !== 'string' ||
+      typeof fields.title !== 'string' ||
+      typeof fields.number !== 'number'
+    ) {
       return null
     }
 
     const mergeCommit = (fields.mergeCommit as { oid?: unknown } | null | undefined)?.oid
     const pullRequest: PullRequest = {
       url: fields.url,
+      number: fields.number,
+      isOpen: fields.state === 'OPEN',
       title: fields.title,
       body: typeof fields.body === 'string' ? fields.body : '',
       mergeCommit: typeof mergeCommit === 'string' ? mergeCommit : null,
       baseBranch: typeof fields.baseRefName === 'string' ? fields.baseRefName : '',
+      headBranch: typeof fields.headRefName === 'string' ? fields.headRefName : '',
       checkedAt: now,
     }
 
@@ -275,6 +301,95 @@ const stageOf = async (
   return label
 }
 
+const previewLinksFrom = (text: string): PreviewLink[] =>
+  text
+    .split(',')
+    .map(part => part.trim())
+    .flatMap(part => {
+      const equals = part.indexOf('=')
+      const label = part.slice(0, equals).trim()
+      const template = part.slice(equals + 1).trim()
+
+      return equals > 0 && template.startsWith('https://') ? [{ label, template }] : []
+    })
+
+const previewOf = async (
+  $: EngineInterface,
+  pullRequest: PullRequest | undefined,
+  now: number,
+): Promise<Preview | null> => {
+  const repository = pullRequest?.url.match(PULL_REQUEST_REPOSITORY)?.[1]
+
+  if (
+    !pullRequest?.isOpen ||
+    !repository ||
+    pullRequest.headBranch === '' ||
+    check.previewWorkflow === '' ||
+    check.previewLinks.length === 0
+  ) {
+    return null
+  }
+
+  const json = await outputOf(
+    $,
+    [
+      'gh',
+      'run',
+      'list',
+      '-R',
+      repository,
+      '--workflow',
+      check.previewWorkflow,
+      '--branch',
+      pullRequest.headBranch,
+      '--limit',
+      '1',
+      '--json',
+      'status,conclusion,event,createdAt,url',
+    ],
+    15_000,
+  )
+
+  try {
+    const [run] = JSON.parse(json ?? '[]') as {
+      status?: unknown
+      conclusion?: unknown
+      event?: unknown
+      createdAt?: unknown
+      url?: unknown
+    }[]
+
+    if (!run || run.event !== 'workflow_dispatch' || typeof run.url !== 'string') {
+      return null
+    }
+
+    if (run.status !== 'completed') {
+      return { status: 'deploying', runUrl: run.url, links: [] }
+    }
+
+    if (run.conclusion !== 'success') {
+      return { status: 'failed', runUrl: run.url, links: [] }
+    }
+
+    const startedAt = typeof run.createdAt === 'string' ? Date.parse(run.createdAt) : Number.NaN
+
+    if (!Number.isFinite(startedAt) || now - startedAt > check.previewIdleMs) {
+      return null
+    }
+
+    return {
+      status: 'ready',
+      runUrl: run.url,
+      links: check.previewLinks.map(({ label, template }) => ({
+        label,
+        href: template.replaceAll('{number}', String(pullRequest.number)),
+      })),
+    }
+  } catch {
+    return null
+  }
+}
+
 const idsInTitle = (title: string): string[] => title.match(TITLE_IDS)?.[1]?.match(ISSUE_ID) ?? []
 
 const idsInBranch = (branch: string | null): string[] => {
@@ -342,9 +457,17 @@ async function refresh($: EngineInterface): Promise<void> {
     const issues = await issuesOf($, ids, now)
     const found = ticketsFrom(pullRequests, branch, check.workspace, issues)
     const deployed = await stageOf($, pullRequests.at(-1), now)
+    const deployment = await previewOf($, pullRequests.at(-1), now)
 
     await update($, tickets, previous => (isSame(previous, found) ? previous : found))
     await update($, stage, () => deployed)
+    await update($, preview, previous =>
+      JSON.stringify(previous) === JSON.stringify(deployment) ? previous : deployment,
+    )
+
+    if (deployment?.status === 'deploying') {
+      refreshLater($, DEPLOYING_RECHECK_MS)
+    }
   } finally {
     check.isRunning = false
   }
@@ -352,6 +475,12 @@ async function refresh($: EngineInterface): Promise<void> {
 
 function refreshSoon($: EngineInterface): void {
   $.clock.after(0, () => {
+    void refresh($).catch(() => undefined)
+  })
+}
+
+function refreshLater($: EngineInterface, ms: number): void {
+  $.clock.after(ms, () => {
     void refresh($).catch(() => undefined)
   })
 }
@@ -370,6 +499,12 @@ export const register: Register = (on, options) => {
   check.workspace = typeof options.workspace === 'string' ? options.workspace.trim() : ''
   check.linearApiKey = typeof options.linearApiKey === 'string' ? options.linearApiKey.trim() : ''
   check.stages = stagesFrom(typeof options.stages === 'string' ? options.stages : '')
+  check.previewLinks = previewLinksFrom(typeof options.previewLinks === 'string' ? options.previewLinks : '')
+  check.previewWorkflow = typeof options.previewWorkflow === 'string' ? options.previewWorkflow.trim() : ''
+  check.previewIdleMs =
+    (typeof options.previewIdleHours === 'number' && options.previewIdleHours > 0
+      ? options.previewIdleHours
+      : 48) * HOUR_MS
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -395,8 +530,9 @@ export const register: Register = (on, options) => {
 
     const list = await read($, tickets)
     const deployed = await read($, stage)
+    const deployment = await read($, preview)
 
-    if (list.length === 0) {
+    if (list.length === 0 && deployment === null) {
       return next(e)
     }
 
@@ -415,12 +551,32 @@ export const register: Register = (on, options) => {
         : [<Text dimColor> · </Text>, label, ...state, ...designs]
     })
     const stageText = deployed === null ? [] : [<Text dimColor> · on {deployed}</Text>]
+    const previewParts = (() => {
+      if (deployment === null) {
+        return []
+      }
+
+      if (deployment.status === 'deploying') {
+        return [<Link href={deployment.runUrl}>Preview deploying</Link>]
+      }
+
+      if (deployment.status === 'failed') {
+        return [<Link href={deployment.runUrl}>Preview failed</Link>]
+      }
+
+      return deployment.links.flatMap((link, index) =>
+        index === 0 ? [<Link href={link.href}>{link.label}</Link>] : [<Text dimColor> · </Text>, <Link href={link.href}>{link.label}</Link>],
+      )
+    })()
+    const previewText =
+      previewParts.length === 0 ? [] : list.length === 0 ? previewParts : [<Text dimColor> · </Text>, ...previewParts]
 
     return (
       <Text>
-        <Text dimColor>Linear </Text>
+        {list.length === 0 ? [] : [<Text dimColor>Linear </Text>]}
         {parts}
         {stageText}
+        {previewText}
       </Text>
     )
   })
