@@ -3,11 +3,11 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Preview, Ticket } from '../types'
 
-const tickets = atom({ plugin: 'linear-link', key: 'tickets' } as const, [], {
+const tickets = atom({ plugin: 'status-bar', key: 'tickets' } as const, [], {
   shape: 'tickets-3',
 })
-const stage = atom({ plugin: 'linear-link', key: 'stage' } as const, null)
-const preview = atom({ plugin: 'linear-link', key: 'preview' } as const, null, {
+const stage = atom({ plugin: 'status-bar', key: 'stage' } as const, null)
+const preview = atom({ plugin: 'status-bar', key: 'preview' } as const, null, {
   shape: 'preview-1',
 })
 

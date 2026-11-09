@@ -11,8 +11,8 @@
       "description": "macOS banners when a Claude desktop app session finishes, opening the session on click"
     },
     {
-      "name": "linear-link",
-      "source": "./plugins/linear-link",
+      "name": "status-bar",
+      "source": "./plugins/status-bar",
       "description": "The session's Linear ticket with its state and Figma frames, its pull request's preview and deploy stage, as links above the message box"
     }
   ]

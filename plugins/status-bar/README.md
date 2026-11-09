@@ -1,4 +1,4 @@
-# linear-link
+# status-bar
 
 The Claude desktop app shows each session's pull request. This plugin adds what the app can't
 know: the session's Linear ticket, its state, its designs, the pull request's preview and how
@@ -32,13 +32,13 @@ the message box, in every session that works on a ticket.
 
 ```bash
 claude plugin marketplace add IgorKrupenja/claude-plugins
-claude plugin install linear-link@igor-plugins
+claude plugin install status-bar@igor-plugins
 ```
 
 ## Settings
 
-Both are optional. Set them with `/plugin configure linear-link@igor-plugins` in Claude Code, or
-pipe a JSON object to `claude plugin configure linear-link@igor-plugins --values-stdin`.
+Both are optional. Set them with `/plugin configure status-bar@igor-plugins` in Claude Code, or
+pipe a JSON object to `claude plugin configure status-bar@igor-plugins --values-stdin`.
 
 - `linearApiKey`: a personal API key from Linear (Settings > Security & access), for the Figma
   links and each ticket's exact URL. It is kept in secure storage, never in `settings.json`.
@@ -56,6 +56,6 @@ pipe a JSON object to `claude plugin configure linear-link@igor-plugins --values
 ## Develop
 
 ```bash
-claude plugin validate plugins/linear-link
-claude plugin test plugins/linear-link
+claude plugin validate plugins/status-bar
+claude plugin test plugins/status-bar
 ```

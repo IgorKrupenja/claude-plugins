@@ -8,6 +8,6 @@ export type Preview = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'linear-link': { tickets: Shaped<Ticket[]>; stage: string | null; preview: Shaped<Preview | null> }
+    'status-bar': { tickets: Shaped<Ticket[]>; stage: string | null; preview: Shaped<Preview | null> }
   }
 }

@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import { expect, mock, test } from 'claude-code/testing'
 
 const BAND = {
-  plugin: 'linear-link',
+  plugin: 'status-bar',
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
