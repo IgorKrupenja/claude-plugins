@@ -1,0 +1,31 @@
+{
+  "name": "worktree-warmup",
+  "version": "0.1.0",
+  "description": "Installs a new worktree's dependencies in the background the moment its session starts, with progress above the message box",
+  "author": {
+    "name": "Igor Krupenja"
+  },
+  "homepage": "https://github.com/IgorKrupenja/claude-plugins",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "command": {
+      "type": "string",
+      "title": "Setup command",
+      "description": "What runs in a new worktree, from its root, under the node version .nvmrc names when nvm is installed",
+      "default": "pnpm install --frozen-lockfile"
+    },
+    "trigger": {
+      "type": "string",
+      "title": "Only with this file",
+      "description": "The setup runs only in a worktree that has this file at its root",
+      "default": "pnpm-lock.yaml"
+    },
+    "marker": {
+      "type": "string",
+      "title": "Skip when this exists",
+      "description": "The setup is skipped when this path already exists at the worktree's root",
+      "default": "node_modules"
+    }
+  }
+}

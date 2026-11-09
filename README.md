@@ -7,6 +7,7 @@ Anthropic.
 | --- | --- |
 | [session-banners](plugins/session-banners) | A macOS banner when a session finishes. One click opens that session. |
 | [status-bar](plugins/status-bar) | The session's Linear ticket with its state and Figma frames, its pull request's preview and how far it has deployed, in a row above the message box. |
+| [worktree-warmup](plugins/worktree-warmup) | Installs a new worktree's dependencies in the background when its session starts, with progress above the message box. |
 
 ## Install
 
@@ -16,6 +17,7 @@ Add the marketplace once, then install the plugins you want:
 claude plugin marketplace add IgorKrupenja/claude-plugins
 claude plugin install session-banners@igor-plugins
 claude plugin install status-bar@igor-plugins
+claude plugin install worktree-warmup@igor-plugins
 ```
 
 Or run `/plugin marketplace add IgorKrupenja/claude-plugins` and then

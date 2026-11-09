@@ -14,6 +14,11 @@
       "name": "status-bar",
       "source": "./plugins/status-bar",
       "description": "The session's Linear ticket with its state and Figma frames, its pull request's preview and deploy stage, as links above the message box"
+    },
+    {
+      "name": "worktree-warmup",
+      "source": "./plugins/worktree-warmup",
+      "description": "Installs a new worktree's dependencies in the background the moment its session starts, with progress above the message box"
     }
   ]
 }

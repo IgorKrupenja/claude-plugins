@@ -536,7 +536,8 @@ export const register: Register = (on, options) => {
       return next(e)
     }
 
-    const { Link, Text } = $.ui.resolve(e)
+    const below = await next(e)
+    const { Box, Link, Text } = $.ui.resolve(e)
     const parts = list.flatMap((ticket, index) => {
       const label =
         ticket.url === null ? <Text>{ticket.id}</Text> : <Link href={ticket.url}>{ticket.id}</Link>
@@ -572,12 +573,15 @@ export const register: Register = (on, options) => {
       previewParts.length === 0 ? [] : list.length === 0 ? previewParts : [<Text dimColor> · </Text>, ...previewParts]
 
     return (
-      <Text>
-        {list.length === 0 ? [] : [<Text dimColor>Linear </Text>]}
-        {parts}
-        {stageText}
-        {previewText}
-      </Text>
+      <Box flexDirection="column">
+        <Text>
+          {list.length === 0 ? [] : [<Text dimColor>Linear </Text>]}
+          {parts}
+          {stageText}
+          {previewText}
+        </Text>
+        {below}
+      </Box>
     )
   })
 }

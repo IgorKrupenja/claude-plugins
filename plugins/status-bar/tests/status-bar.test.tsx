@@ -161,6 +161,7 @@ test('links the ticket of the pull request the session is bound to', async ($, o
     expect(link?.props.href).toBe('https://linear.app/acme/issue/LIQ-5463/buy-tab')
     expect(link?.children).toEqual(['LIQ-5463'])
     expect(await ui.find({ type: 'Link', text: /LIQ-5383$/ })).toBeUndefined()
+    expect((await ui.find({ type: 'Text', text: /^engine$/ }))?.text).toBe('engine')
     await ui.unmount()
   }
 })
