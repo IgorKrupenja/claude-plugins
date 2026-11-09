@@ -21,11 +21,15 @@ const REPO = 'https://github.com/acme/app/pull'
 
 type PullRequest = { url: string; title: string; body: string }
 
+type Issue = { url: string; description: string; attachments?: readonly string[] }
+
 type World = {
   branch: string | null
   linked?: readonly string[]
   branchPullRequest?: PullRequest
   pullRequests?: readonly PullRequest[]
+  issues?: Readonly<Record<string, Issue>>
+  linearCalls?: { count: number }
 }
 
 const ran = (exitCode: number, stdout: string) => ({
@@ -65,6 +69,31 @@ const start = async ($: Engine, on: On, world: World) => {
         : world.pullRequests?.find(candidate => candidate.url === url)
 
     return pullRequest === undefined ? ran(1, '') : ran(0, JSON.stringify(pullRequest))
+  })
+  on('http.fetch', (_, e) => {
+    if (world.linearCalls) {
+      world.linearCalls.count += 1
+    }
+
+    const query = String(JSON.parse(String(e.init?.body ?? '{}')).query ?? '')
+    const data = Object.fromEntries(
+      [...query.matchAll(/(i\d+): issue\(id: "([^"]+)"\)/g)].map(([, alias, id]) => {
+        const issue = world.issues?.[id ?? '']
+
+        return [
+          alias,
+          issue
+            ? {
+                url: issue.url,
+                description: issue.description,
+                attachments: { nodes: (issue.attachments ?? []).map(url => ({ url })) },
+              }
+            : null,
+        ]
+      }),
+    )
+
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ data }) } }
   })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('ui.render', ($, e) => {
@@ -170,5 +199,67 @@ test('yields the band to a survey', { options: { workspace: 'acme' } }, async ($
 
   expect(await ui.find({ type: 'Link' })).toBeUndefined()
   expect((await ui.find({ type: 'Text' }))?.text).toBe('engine')
+  await ui.unmount()
+})
+
+test('adds the Figma frames the ticket links', { options: { linearApiKey: 'key' } }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    linked: [`${REPO}/3268`],
+    pullRequests: [{ url: `${REPO}/3268`, title: 'feat(payments): LIQ-5463: the Buy tab', body: '' }],
+    issues: {
+      'LIQ-5463': {
+        url: 'https://linear.app/acme/issue/LIQ-5463/the-buy-tab',
+        description: 'Design: [Buy](https://www.figma.com/design/abc/Buy?node-id=1-2)',
+        attachments: ['https://www.figma.com/design/abc/Buy?node-id=3-4', 'https://github.com/acme/app/pull/3268'],
+      },
+    },
+  })
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+
+    expect((await ui.find({ type: 'Link', text: /LIQ-5463$/ }))?.props.href).toBe(
+      'https://linear.app/acme/issue/LIQ-5463/the-buy-tab',
+    )
+    expect((await ui.find({ type: 'Link', text: /Figma 1$/ }))?.props.href).toBe(
+      'https://www.figma.com/design/abc/Buy?node-id=1-2',
+    )
+    expect((await ui.find({ type: 'Link', text: /Figma 2$/ }))?.props.href).toBe(
+      'https://www.figma.com/design/abc/Buy?node-id=3-4',
+    )
+    await ui.unmount()
+  }
+})
+
+test('names a lone frame Figma', { options: { linearApiKey: 'key' } }, async ($, on) => {
+  await start($, on, {
+    branch: 'liq-77-modal',
+    issues: {
+      'LIQ-77': { url: 'https://linear.app/acme/issue/LIQ-77/modal', description: 'https://www.figma.com/design/xyz/Modal' },
+    },
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const figma = await ui.find({ type: 'Link', text: /Figma$/ })
+
+  expect(figma?.children).toEqual(['Figma'])
+  expect((await ui.find({ type: 'Link', text: /LIQ-77$/ }))?.props.href).toBe('https://linear.app/acme/issue/LIQ-77/modal')
+  await ui.unmount()
+})
+
+test('asks Linear nothing without an API key', { options: { workspace: 'acme' } }, async ($, on) => {
+  const linearCalls = { count: 0 }
+
+  await start($, on, {
+    branch: 'liq-77-modal',
+    linearCalls,
+    issues: { 'LIQ-77': { url: 'https://linear.app/acme/issue/LIQ-77/modal', description: 'https://www.figma.com/design/xyz/Modal' } },
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(linearCalls.count).toBe(0)
+  expect(await ui.find({ type: 'Link', text: /Figma/ })).toBeUndefined()
   await ui.unmount()
 })

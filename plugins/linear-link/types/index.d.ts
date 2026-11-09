@@ -1,4 +1,4 @@
-export type Ticket = { id: string; url: string | null }
+export type Ticket = { id: string; url: string | null; figma: string[] }
 
 declare module 'claude-code' {
   interface PluginState {

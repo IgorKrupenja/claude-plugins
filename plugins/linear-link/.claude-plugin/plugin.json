@@ -1,7 +1,7 @@
 {
   "name": "linear-link",
-  "version": "0.1.0",
-  "description": "The session's Linear ticket as a link above the message box, read from the pull request title or the branch name",
+  "version": "0.2.0",
+  "description": "The session's Linear ticket and its Figma frames as links above the message box, read from the pull request the app shows or the branch name",
   "author": {
     "name": "Igor Krupenja"
   },
@@ -13,6 +13,13 @@
       "type": "string",
       "title": "Linear workspace",
       "description": "The workspace's URL key, the acme in linear.app/acme/issue/ACME-1, for a link before the pull request body carries one",
+      "default": ""
+    },
+    "linearApiKey": {
+      "type": "string",
+      "title": "Linear API key",
+      "description": "A personal API key from Linear (Settings > Security & access), to show each ticket's Figma frames and exact URL. Stored in secure storage. Optional.",
+      "sensitive": true,
       "default": ""
     }
   }
