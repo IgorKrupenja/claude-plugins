@@ -21,7 +21,7 @@ const COMMON_DIR = '/repo/.git'
 
 type World = {
   isWorktree?: boolean
-  files?: Readonly<Record<string, boolean>>
+  files?: Readonly<Record<string, number>>
   output?: readonly string[]
   code?: number
   gate?: Promise<void>
@@ -35,14 +35,17 @@ const start = async ($: Engine, on: On, world: World) => {
   const clock = mock.clock(on)
   const spawned: { argv: readonly string[]; cwd?: string }[] = []
   const commands: string[] = []
-  const files = world.files ?? { [`${ROOT}/pnpm-lock.yaml`]: true }
+  const files = world.files ?? { [`${ROOT}/pnpm-lock.yaml`]: 100 }
 
   on('process.run', () =>
     world.isWorktree === false
       ? ran(0, `/repo\n${COMMON_DIR}\n${COMMON_DIR}\n`)
       : ran(0, `${ROOT}\n${GIT_DIR}\n${COMMON_DIR}\n`),
   )
-  on('fs.exists', (_, e) => ({ value: files[e.path] ?? false }))
+  on('fs.exists', (_, e) => ({ value: files[e.path] !== undefined }))
+  on('fs.stat', (_, e) => ({
+    value: { kind: 'file' as const, size: 1, mtimeMs: files[e.path] ?? 0, isLink: false },
+  }))
   on('fs.write', () => ({ value: undefined }))
   on('process.spawn', async function* (_, e) {
     spawned.push({ argv: e.argv, cwd: e.cwd })
@@ -102,10 +105,30 @@ test('leaves the primary checkout alone', async ($, on) => {
   expect(spawned).toHaveLength(0)
 })
 
-test('leaves an installed worktree alone', async ($, on) => {
-  const { spawned } = await start($, on, {
-    files: { [`${ROOT}/pnpm-lock.yaml`]: true, [`${ROOT}/node_modules`]: true },
-  })
+const LOCK = `${ROOT}/pnpm-lock.yaml`
+const INSTALLED = `${ROOT}/node_modules/.modules.yaml`
+const REGISTRY = `${ROOT}/packages/shared/src/mediaRegistry.generated.ts`
+
+test('leaves a worktree installed after its lockfile changed alone', async ($, on) => {
+  const { spawned } = await start($, on, { files: { [LOCK]: 100, [INSTALLED]: 200 } })
+
+  expect(spawned).toHaveLength(0)
+})
+
+test('sets up a worktree whose install is older than its lockfile', async ($, on) => {
+  const { spawned } = await start($, on, { files: { [LOCK]: 300, [INSTALLED]: 200 } })
+
+  expect(spawned).toHaveLength(1)
+})
+
+test('sets up a worktree missing a file the setup generates', { options: { requires: 'packages/shared/src/mediaRegistry.generated.ts' } }, async ($, on) => {
+  const missing = await start($, on, { files: { [LOCK]: 100, [INSTALLED]: 200 } })
+
+  expect(missing.spawned).toHaveLength(1)
+})
+
+test('leaves a worktree with every required file alone', { options: { requires: 'packages/shared/src/mediaRegistry.generated.ts' } }, async ($, on) => {
+  const { spawned } = await start($, on, { files: { [LOCK]: 100, [INSTALLED]: 200, [REGISTRY]: 150 } })
 
   expect(spawned).toHaveLength(0)
 })

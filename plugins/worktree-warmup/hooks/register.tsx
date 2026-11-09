@@ -14,7 +14,7 @@ const OUTPUT_LIMIT = 200_000
 const LINE_LIMIT = 120
 const WAITING_TIMEOUT_MS = 600_000
 
-const settings = { command: '', trigger: '', marker: '' }
+const settings = { command: '', trigger: '', installed: '', requires: [] as string[] }
 const run = { donePath: null as string | null, isRunning: false }
 
 const outputOf = async (
@@ -75,11 +75,36 @@ async function worktreeOf(
     return null
   }
 
-  if (!isForced && settings.marker !== '' && (await $.fs.exists(`${root}/${settings.marker}`))) {
+  if (!isForced && (await isReady($, root))) {
     return null
   }
 
   return { root, gitDir }
+}
+
+async function isReady($: EngineInterface, root: string): Promise<boolean> {
+  if (settings.installed === '' || !(await $.fs.exists(`${root}/${settings.installed}`))) {
+    return false
+  }
+
+  if (settings.trigger !== '') {
+    const [installed, trigger] = await Promise.all([
+      $.fs.stat(`${root}/${settings.installed}`),
+      $.fs.stat(`${root}/${settings.trigger}`),
+    ])
+
+    if (installed.mtimeMs < trigger.mtimeMs) {
+      return false
+    }
+  }
+
+  for (const path of settings.requires) {
+    if (!(await $.fs.exists(`${root}/${path}`))) {
+      return false
+    }
+  }
+
+  return true
 }
 
 async function startWarmup($: EngineInterface, isForced: boolean): Promise<void> {
@@ -159,7 +184,11 @@ const secondsBetween = (startedAt: number, endedAt: number | null): number =>
 export const register: Register = (on, options) => {
   settings.command = typeof options.command === 'string' ? options.command.trim() : ''
   settings.trigger = typeof options.trigger === 'string' ? options.trigger.trim() : ''
-  settings.marker = typeof options.marker === 'string' ? options.marker.trim() : ''
+  settings.installed = typeof options.installed === 'string' ? options.installed.trim() : ''
+  settings.requires = (typeof options.requires === 'string' ? options.requires : '')
+    .split(',')
+    .map(path => path.trim())
+    .filter(path => path !== '')
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)

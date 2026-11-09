@@ -1,6 +1,6 @@
 {
   "name": "worktree-warmup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Installs a new worktree's dependencies in the background the moment its session starts, with progress above the message box",
   "author": {
     "name": "Igor Krupenja"
@@ -18,14 +18,20 @@
     "trigger": {
       "type": "string",
       "title": "Only with this file",
-      "description": "The setup runs only in a worktree that has this file at its root",
+      "description": "The setup runs only in a worktree that has this file at its root, and again whenever it is newer than the install",
       "default": "pnpm-lock.yaml"
     },
-    "marker": {
+    "installed": {
       "type": "string",
-      "title": "Skip when this exists",
-      "description": "The setup is skipped when this path already exists at the worktree's root",
-      "default": "node_modules"
+      "title": "Install record",
+      "description": "The file an install writes, whose age says whether the install is older than the trigger file",
+      "default": "node_modules/.modules.yaml"
+    },
+    "requires": {
+      "type": "string",
+      "title": "Also required",
+      "description": "Comma-separated paths a ready worktree also has, such as files the setup command generates; one missing runs the setup",
+      "default": ""
     }
   }
 }

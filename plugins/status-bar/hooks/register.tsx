@@ -50,6 +50,7 @@ const check = {
   previewWorkflow: '',
   previewIdleMs: 48 * HOUR_MS,
   transcript: null as { sessionId: string; path: string | null } | null,
+  promptLinks: null as { transcript: string; links: Map<string, string> } | null,
   pullRequests: new Map<string, PullRequest>(),
   issues: new Map<string, Issue>(),
   deployed: new Map<string, { label: string | null; checkedAt: number }>(),
@@ -112,6 +113,55 @@ const linkedPullRequestsOf = async ($: EngineInterface): Promise<string[]> => {
   const newestFirst = [...new Set(urls.reverse())]
 
   return newestFirst.slice(0, LINKED_PULL_REQUESTS).reverse()
+}
+
+const textOf = (row: string): string => {
+  try {
+    const content = (JSON.parse(row) as { message?: { content?: unknown } }).message?.content
+
+    if (typeof content === 'string') {
+      return content
+    }
+
+    return Array.isArray(content)
+      ? content.map(block => ((block as { text?: unknown }).text as string | undefined) ?? '').join('\n')
+      : ''
+  } catch {
+    return ''
+  }
+}
+
+const promptLinksOf = async ($: EngineInterface): Promise<Map<string, string>> => {
+  const transcript = await transcriptOf($)
+
+  if (transcript === null) {
+    return new Map()
+  }
+
+  if (check.promptLinks?.transcript === transcript && check.promptLinks.links.size > 0) {
+    return check.promptLinks.links
+  }
+
+  const rows = await outputOf($, ['grep', '-F', '"kind":"human"', transcript], 10_000)
+  const links = new Map<string, string>()
+
+  for (const row of (rows ?? '').split('\n')) {
+    for (const match of textOf(row).matchAll(LINEAR_URL)) {
+      const id = match[2]?.toUpperCase()
+
+      if (id && !links.has(id)) {
+        links.set(id, match[0])
+      }
+    }
+
+    if (links.size > 0) {
+      break
+    }
+  }
+
+  check.promptLinks = { transcript, links }
+
+  return links
 }
 
 const pullRequestOf = async (
@@ -403,6 +453,7 @@ const idsInBranch = (branch: string | null): string[] => {
 const ticketsFrom = (
   pullRequests: readonly PullRequest[],
   branch: string | null,
+  promptLinks: ReadonlyMap<string, string>,
   workspace: string,
   issues: ReadonlyMap<string, Issue>,
 ): Ticket[] => {
@@ -422,13 +473,17 @@ const ticketsFrom = (
   }
 
   const fromTitles = [...new Set(pullRequests.flatMap(pullRequest => idsInTitle(pullRequest.title)))]
-  const ids = fromTitles.length > 0 ? fromTitles : idsInBranch(branch)
+  const fromBranch = fromTitles.length > 0 ? fromTitles : idsInBranch(branch)
+  const ids = fromBranch.length > 0 ? fromBranch : [...promptLinks.keys()]
   const base = workspace || linkedWorkspace
 
   return ids.map(id => ({
     id,
     url:
-      links.get(id) ?? issues.get(id)?.url ?? (base ? `https://linear.app/${base}/issue/${id}` : null),
+      links.get(id) ??
+      promptLinks.get(id) ??
+      issues.get(id)?.url ??
+      (base ? `https://linear.app/${base}/issue/${id}` : null),
     state: issues.get(id)?.state ?? null,
     figma: issues.get(id)?.figma ?? [],
   }))
@@ -453,9 +508,12 @@ async function refresh($: EngineInterface): Promise<void> {
         ? await Promise.all(linked.map(url => pullRequestOf($, url, now)))
         : [branch === null ? null : await pullRequestOf($, null, now)]
     const pullRequests = fetched.filter((pullRequest): pullRequest is PullRequest => pullRequest !== null)
-    const ids = ticketsFrom(pullRequests, branch, check.workspace, new Map()).map(ticket => ticket.id)
+    const promptLinks = await promptLinksOf($)
+    const ids = ticketsFrom(pullRequests, branch, promptLinks, check.workspace, new Map()).map(
+      ticket => ticket.id,
+    )
     const issues = await issuesOf($, ids, now)
-    const found = ticketsFrom(pullRequests, branch, check.workspace, issues)
+    const found = ticketsFrom(pullRequests, branch, promptLinks, check.workspace, issues)
     const deployed = await stageOf($, pullRequests.at(-1), now)
     const deployment = await previewOf($, pullRequests.at(-1), now)
 

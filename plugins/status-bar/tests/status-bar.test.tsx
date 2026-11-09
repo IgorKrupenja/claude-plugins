@@ -39,6 +39,7 @@ type World = {
   branchPullRequest?: PullRequest
   pullRequests?: readonly PullRequest[]
   issues?: Readonly<Record<string, Issue>>
+  prompts?: readonly string[]
   linearCalls?: { count: number }
   compare?: Readonly<Record<string, string>>
   runs?: readonly Run[]
@@ -67,6 +68,24 @@ const start = async ($: Engine, on: On, world: World) => {
 
     if (command === 'find') {
       return ran(0, `${TRANSCRIPT}\n`)
+    }
+
+    if (command === 'grep' && args.includes('"kind":"human"')) {
+      const rows = (world.prompts ?? []).map(text =>
+        JSON.stringify({
+          type: 'user',
+          origin: { kind: 'human' },
+          message: {
+            role: 'user',
+            content: [
+              { type: 'text', text: '<system-reminder>worktree</system-reminder>' },
+              { type: 'text', text },
+            ],
+          },
+        }),
+      )
+
+      return rows.length === 0 ? ran(1, '') : ran(0, `${rows.join('\n')}\n`)
     }
 
     if (command === 'grep') {
@@ -475,5 +494,39 @@ test('shows no preview once the newest run is the teardown', { options: PREVIEW_
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
   expect(await ui.find({ type: 'Link', text: /Preview/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('takes the ticket from the first prompt that links one', async ($, on) => {
+  await start($, on, {
+    branch: 'igor/revolut-bank-deposit-maximum-fc297f',
+    prompts: [
+      'pls implement this https://linear.app/acme/issue/LIQ-5925/revolut-and-bank-deposit-maximum but turn off auto merge',
+      'also see https://linear.app/acme/issue/LIQ-1/other',
+    ],
+  })
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+
+    expect((await ui.find({ type: 'Link', text: /LIQ-5925$/ }))?.props.href).toBe(
+      'https://linear.app/acme/issue/LIQ-5925/revolut-and-bank-deposit-maximum',
+    )
+    expect(await ui.find({ type: 'Link', text: /LIQ-1$/ })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('prefers the pull request title over the prompt', { options: { workspace: 'acme' } }, async ($, on) => {
+  await start($, on, {
+    branch: 'cleanup',
+    branchPullRequest: { url: `${REPO}/12`, title: 'fix(app): LIQ-12: the fix', body: '' },
+    prompts: ['start on https://linear.app/acme/issue/LIQ-99/old-idea'],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Link', text: /LIQ-12$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Link', text: /LIQ-99$/ })).toBeUndefined()
   await ui.unmount()
 })
