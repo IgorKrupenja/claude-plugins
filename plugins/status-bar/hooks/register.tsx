@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Preview, Ticket } from '../types'
+import { watchPullRequests } from './watch'
 
 const tickets = atom({ plugin: 'status-bar', key: 'tickets' } as const, [], {
   shape: 'tickets-3',
@@ -25,6 +26,7 @@ const ISSUE_RECHECK_MS = 10 * 60_000
 const STAGE_RECHECK_MS = 10 * 60_000
 const PULL_REQUEST_REPOSITORY = /github\.com\/([^/]+\/[^/]+)\/pull\/\d+/
 const DEPLOYING_RECHECK_MS = 60_000
+const WATCH_EVERY_MS = 60_000
 const HOUR_MS = 60 * 60_000
 
 type PullRequest = {
@@ -55,6 +57,11 @@ const check = {
   issues: new Map<string, Issue>(),
   deployed: new Map<string, { label: string | null; checkedAt: number }>(),
   stopTimer: null as (() => void) | null,
+  isWatching: false,
+  deployWorkflow: '',
+  watchTargets: [] as string[],
+  stopWatch: null as (() => void) | null,
+  isWatchRunning: false,
   isRunning: false,
 }
 
@@ -508,6 +515,8 @@ async function refresh($: EngineInterface): Promise<void> {
         ? await Promise.all(linked.map(url => pullRequestOf($, url, now)))
         : [branch === null ? null : await pullRequestOf($, null, now)]
     const pullRequests = fetched.filter((pullRequest): pullRequest is PullRequest => pullRequest !== null)
+
+    check.watchTargets = pullRequests.map(pullRequest => pullRequest.url)
     const promptLinks = await promptLinksOf($)
     const ids = ticketsFrom(pullRequests, branch, promptLinks, check.workspace, new Map()).map(
       ticket => ticket.id,
@@ -543,6 +552,45 @@ function refreshLater($: EngineInterface, ms: number): void {
   })
 }
 
+async function watchTick($: EngineInterface): Promise<void> {
+  if (!check.isWatching || check.isWatchRunning || check.watchTargets.length === 0) {
+    return
+  }
+
+  check.isWatchRunning = true
+
+  try {
+    const messages = await watchPullRequests($, check.watchTargets, {
+      deployWorkflow: check.deployWorkflow,
+      stages: check.stages,
+    })
+
+    for (const message of messages) {
+      await $.prompt.submit({ text: `status-bar: ${message}` })
+    }
+
+    if (messages.length > 0) {
+      refreshSoon($)
+    }
+  } finally {
+    check.isWatchRunning = false
+  }
+}
+
+function watchEvery($: EngineInterface): void {
+  check.stopWatch?.()
+
+  if (!check.isWatching) {
+    return
+  }
+
+  const timer = $.clock.every(WATCH_EVERY_MS, () => {
+    void watchTick($).catch(() => undefined)
+  })
+
+  check.stopWatch = () => timer.cancel()
+}
+
 function refreshEvery($: EngineInterface): void {
   check.stopTimer?.()
 
@@ -557,6 +605,8 @@ export const register: Register = (on, options) => {
   check.workspace = typeof options.workspace === 'string' ? options.workspace.trim() : ''
   check.linearApiKey = typeof options.linearApiKey === 'string' ? options.linearApiKey.trim() : ''
   check.stages = stagesFrom(typeof options.stages === 'string' ? options.stages : '')
+  check.isWatching = options.watchPullRequests === true
+  check.deployWorkflow = typeof options.deployWorkflow === 'string' ? options.deployWorkflow.trim() : ''
   check.previewLinks = previewLinksFrom(typeof options.previewLinks === 'string' ? options.previewLinks : '')
   check.previewWorkflow = typeof options.previewWorkflow === 'string' ? options.previewWorkflow.trim() : ''
   check.previewIdleMs =
@@ -569,6 +619,7 @@ export const register: Register = (on, options) => {
 
     refreshSoon($)
     refreshEvery($)
+    watchEvery($)
 
     return started
   })

@@ -1,6 +1,6 @@
 {
   "name": "status-bar",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The session's Linear ticket with its state and Figma frames, its pull request's preview and deploy stage, as links above the message box",
   "author": {
     "name": "Igor Krupenja"
@@ -45,6 +45,18 @@
       "title": "Preview lifetime (hours)",
       "description": "Hours after its last deploy that a preview is torn down; an older preview is not shown.",
       "default": 48
+    },
+    "watchPullRequests": {
+      "type": "boolean",
+      "title": "Watch pull requests",
+      "description": "Post into the session when its pull request is approved, leaves the merge queue, turns ready to merge with auto-merge off, merges, closes, or deploys or fails to deploy to each stage, so Claude can act on it",
+      "default": false
+    },
+    "deployWorkflow": {
+      "type": "string",
+      "title": "Deploy workflow",
+      "description": "The workflow file whose push runs on each stage branch deploy it, for the watch's deploy events",
+      "default": "deploy.yml"
     }
   }
 }
