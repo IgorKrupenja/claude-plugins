@@ -5,7 +5,7 @@
   "author": {
     "name": "Igor Krupenja"
   },
-  "homepage": "https://github.com/IgorKrupenja/claude-notify",
+  "homepage": "https://github.com/IgorKrupenja/claude-plugins",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {

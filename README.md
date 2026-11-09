@@ -13,12 +13,12 @@ Anthropic.
 Add the marketplace once, then install the plugins you want:
 
 ```bash
-claude plugin marketplace add IgorKrupenja/claude-notify
+claude plugin marketplace add IgorKrupenja/claude-plugins
 claude plugin install session-banners@igor-plugins
 claude plugin install linear-link@igor-plugins
 ```
 
-Or run `/plugin marketplace add IgorKrupenja/claude-notify` and then
+Or run `/plugin marketplace add IgorKrupenja/claude-plugins` and then
 `/plugin install <plugin>@igor-plugins` in a Claude Code session. Each plugin's README covers its
 requirements and settings.
 

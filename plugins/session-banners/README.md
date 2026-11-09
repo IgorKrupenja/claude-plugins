@@ -18,11 +18,11 @@ banner tells you, and one click takes you straight back to it.
 ## Install
 
 ```bash
-claude plugin marketplace add IgorKrupenja/claude-notify
+claude plugin marketplace add IgorKrupenja/claude-plugins
 claude plugin install session-banners@igor-plugins
 ```
 
-Or run `/plugin marketplace add IgorKrupenja/claude-notify` and then
+Or run `/plugin marketplace add IgorKrupenja/claude-plugins` and then
 `/plugin install session-banners@igor-plugins` in a Claude Code session.
 
 The next session builds the helper app, Claude Notify, which takes about 15 seconds once. The

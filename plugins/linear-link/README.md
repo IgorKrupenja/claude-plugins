@@ -20,7 +20,7 @@ on a ticket.
 ## Install
 
 ```bash
-claude plugin marketplace add IgorKrupenja/claude-notify
+claude plugin marketplace add IgorKrupenja/claude-plugins
 claude plugin install linear-link@igor-plugins
 ```
 
