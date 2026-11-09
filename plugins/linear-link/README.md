@@ -4,9 +4,10 @@ The Claude desktop app shows each session's pull request. This plugin adds the s
 ticket: a `Linear LIQ-123` link in a slim row above the message box, in every session that works
 on a ticket.
 
-- **Read from what you already write:** the ticket IDs come from the pull request title
-  (`feat(api): LIQ-123: ...`, several IDs work too), or from the branch name (`liq-123-...`)
-  before the pull request exists.
+- **Read from what you already write:** the ticket IDs come from the title of the pull request
+  the app shows for the session (`feat(api): LIQ-123: ...`, several IDs work too), then the
+  current branch's pull request, then the branch name (`liq-123-...`) before any pull request
+  exists. A worktree on a detached HEAD still gets its link from the session's pull request.
 - **The exact ticket page:** the link is the Linear URL the pull request body carries, or
   `linear.app/<workspace>/issue/<id>` when it has none.
 - **Keeps up by itself:** it checks again after every turn, so a new branch or a new pull request

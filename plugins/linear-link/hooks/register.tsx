@@ -12,9 +12,18 @@ const TITLE_IDS =
 const ISSUE_ID = /[A-Z][A-Z0-9]{0,6}-\d+/g
 const BRANCH_ID = /(?:^|\/)([a-z][a-z0-9]{1,4})-(\d+)(?=-|$)/i
 const LINEAR_URL = /https:\/\/linear\.app\/([\w-]+)\/issue\/([A-Za-z][A-Za-z0-9]*-\d+)(?:\/[\w%-]+)?/g
+const PR_LINK_ROW = /^\{"type":"pr-link".*"prUrl":"(https:\/\/github\.com\/[^"]+\/pull\/\d+)"/
+const LINKED_PULL_REQUESTS = 3
 const PULL_REQUEST_RECHECK_MS = 5 * 60_000
 
-type PullRequest = { title: string; body: string }
+type PullRequest = { url: string; title: string; body: string; checkedAt: number }
+
+const check = {
+  workspace: '',
+  transcript: null as { sessionId: string; path: string | null } | null,
+  pullRequests: new Map<string, PullRequest>(),
+  isRunning: false,
+}
 
 const outputOf = async (
   $: EngineInterface,
@@ -36,11 +45,59 @@ const branchOf = async ($: EngineInterface): Promise<string | null> => {
   return branch ? branch : null
 }
 
-const pullRequestOf = async ($: EngineInterface): Promise<PullRequest | null> => {
-  const json = await outputOf($, ['gh', 'pr', 'view', '--json', 'title,body'], 15_000)
+const transcriptOf = async ($: EngineInterface): Promise<string | null> => {
+  const sessionId = await $.session.id()
+
+  if (check.transcript?.sessionId === sessionId) {
+    return check.transcript.path
+  }
+
+  const configDirectory = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? ''}/.claude`
+  const found = await outputOf(
+    $,
+    ['find', `${configDirectory}/projects`, '-maxdepth', '2', '-name', `${sessionId}.jsonl`],
+    10_000,
+  )
+  const path = found?.split('\n').find(line => line.endsWith('.jsonl')) ?? null
+
+  check.transcript = { sessionId, path }
+
+  return path
+}
+
+const linkedPullRequestsOf = async ($: EngineInterface): Promise<string[]> => {
+  const transcript = await transcriptOf($)
+
+  if (transcript === null) {
+    return []
+  }
+
+  const rows = await outputOf($, ['grep', '-E', '^\\{"type":"pr-link"', transcript], 10_000)
+  const urls = (rows ?? '')
+    .split('\n')
+    .map(row => row.match(PR_LINK_ROW)?.[1])
+    .filter((url): url is string => url !== undefined)
+  const newestFirst = [...new Set(urls.reverse())]
+
+  return newestFirst.slice(0, LINKED_PULL_REQUESTS).reverse()
+}
+
+const pullRequestOf = async (
+  $: EngineInterface,
+  url: string | null,
+  now: number,
+): Promise<PullRequest | null> => {
+  const cached = url === null ? undefined : check.pullRequests.get(url)
+
+  if (cached && now - cached.checkedAt < PULL_REQUEST_RECHECK_MS) {
+    return cached
+  }
+
+  const target = url === null ? [] : [url]
+  const json = await outputOf($, ['gh', 'pr', 'view', ...target, '--json', 'url,title,body'], 15_000)
 
   if (json === null) {
-    return null
+    return cached ?? null
   }
 
   try {
@@ -50,20 +107,28 @@ const pullRequestOf = async ($: EngineInterface): Promise<PullRequest | null> =>
       return null
     }
 
-    const { title, body } = parsed as Record<string, unknown>
+    const fields = parsed as Record<string, unknown>
 
-    return typeof title === 'string'
-      ? { title, body: typeof body === 'string' ? body : '' }
-      : null
+    if (typeof fields.url !== 'string' || typeof fields.title !== 'string') {
+      return null
+    }
+
+    const pullRequest: PullRequest = {
+      url: fields.url,
+      title: fields.title,
+      body: typeof fields.body === 'string' ? fields.body : '',
+      checkedAt: now,
+    }
+
+    check.pullRequests.set(pullRequest.url, pullRequest)
+
+    return pullRequest
   } catch {
     return null
   }
 }
 
-const unique = (ids: readonly string[]): string[] => [...new Set(ids)]
-
-const idsInTitle = (title: string): string[] =>
-  unique(title.match(TITLE_IDS)?.[1]?.match(ISSUE_ID) ?? [])
+const idsInTitle = (title: string): string[] => title.match(TITLE_IDS)?.[1]?.match(ISSUE_ID) ?? []
 
 const idsInBranch = (branch: string | null): string[] => {
   const match = branch?.match(BRANCH_ID)
@@ -74,26 +139,27 @@ const idsInBranch = (branch: string | null): string[] => {
 }
 
 const ticketsFrom = (
+  pullRequests: readonly PullRequest[],
   branch: string | null,
-  pullRequest: PullRequest | null,
   workspace: string,
 ): Ticket[] => {
   const links = new Map<string, string>()
   let linkedWorkspace: string | undefined
 
-  for (const match of (pullRequest?.body ?? '').matchAll(LINEAR_URL)) {
-    const id = match[2]?.toUpperCase()
+  for (const pullRequest of pullRequests) {
+    for (const match of pullRequest.body.matchAll(LINEAR_URL)) {
+      const id = match[2]?.toUpperCase()
 
-    linkedWorkspace ??= match[1]
+      linkedWorkspace ??= match[1]
 
-    if (id && !links.has(id)) {
-      links.set(id, match[0])
+      if (id && !links.has(id)) {
+        links.set(id, match[0])
+      }
     }
   }
 
-  const fromTitle = pullRequest === null ? [] : idsInTitle(pullRequest.title)
-  const fromBranch = fromTitle.length > 0 ? fromTitle : idsInBranch(branch)
-  const ids = fromBranch.length > 0 ? fromBranch : [...links.keys()]
+  const fromTitles = [...new Set(pullRequests.flatMap(pullRequest => idsInTitle(pullRequest.title)))]
+  const ids = fromTitles.length > 0 ? fromTitles : idsInBranch(branch)
   const base = workspace || linkedWorkspace
 
   return ids.map(id => ({
@@ -103,15 +169,8 @@ const ticketsFrom = (
 }
 
 const isSame = (a: readonly Ticket[], b: readonly Ticket[]): boolean =>
-  a.length === b.length && a.every((ticket, index) => ticket.id === b[index]?.id && ticket.url === b[index]?.url)
-
-const check = {
-  workspace: '',
-  branch: undefined as string | null | undefined,
-  checkedAt: 0,
-  hasPullRequest: false,
-  isRunning: false,
-}
+  a.length === b.length &&
+  a.every((ticket, index) => ticket.id === b[index]?.id && ticket.url === b[index]?.url)
 
 async function refresh($: EngineInterface): Promise<void> {
   if (check.isRunning) {
@@ -121,21 +180,16 @@ async function refresh($: EngineInterface): Promise<void> {
   check.isRunning = true
 
   try {
-    const branch = await branchOf($)
     const now = await $.clock.now()
-    const isFresh =
-      branch === check.branch && check.hasPullRequest && now - check.checkedAt < PULL_REQUEST_RECHECK_MS
+    const branch = await branchOf($)
+    const linked = await linkedPullRequestsOf($)
+    const fetched =
+      linked.length > 0
+        ? await Promise.all(linked.map(url => pullRequestOf($, url, now)))
+        : [branch === null ? null : await pullRequestOf($, null, now)]
+    const pullRequests = fetched.filter((pullRequest): pullRequest is PullRequest => pullRequest !== null)
+    const found = ticketsFrom(pullRequests, branch, check.workspace)
 
-    if (isFresh) {
-      return
-    }
-
-    const pullRequest = branch === null ? null : await pullRequestOf($)
-    const found = ticketsFrom(branch, pullRequest, check.workspace)
-
-    check.branch = branch
-    check.checkedAt = now
-    check.hasPullRequest = pullRequest !== null
     await update($, tickets, previous => (isSame(previous, found) ? previous : found))
   } finally {
     check.isRunning = false
