@@ -7,8 +7,9 @@ the message box, in every session that works on a ticket.
 
 - **Read from what you already write:** the ticket IDs come from the title of the pull request
   the app shows for the session (`feat(api): LIQ-123: ...`, several IDs work too), then the
-  current branch's pull request, then the branch name (`liq-123-...`) before any pull request
-  exists. A worktree on a detached HEAD still gets its link from the session's pull request.
+  current branch's pull request, then the branch name (`liq-123-...`), then the first Linear link
+  you sent in the session, so a new session shows its ticket before any branch or pull request
+  names it. A worktree on a detached HEAD still gets its link from the session's pull request.
 - **The design one click away:** with a Linear API key, every Figma frame the ticket links, in
   its description or as an attachment, gets its own `Figma` link next to the ticket, after the
   ticket's state (`In Review`, `QA`, `Done`).
