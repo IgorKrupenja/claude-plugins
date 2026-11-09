@@ -13,7 +13,7 @@
     {
       "name": "linear-link",
       "source": "./plugins/linear-link",
-      "description": "The session's Linear ticket and its Figma frames as links above the message box, read from the pull request the app shows or the branch name"
+      "description": "The session's Linear ticket with its state and Figma frames, and how far its merged pull request has deployed, as links above the message box"
     }
   ]
 }

@@ -19,9 +19,15 @@ const SURFACES = ['terminal', 'desktop'] as const
 const TRANSCRIPT = '/home/me/.claude/projects/-repo/s1.jsonl'
 const REPO = 'https://github.com/acme/app/pull'
 
-type PullRequest = { url: string; title: string; body: string }
+type PullRequest = {
+  url: string
+  title: string
+  body: string
+  mergeCommit?: { oid: string } | null
+  baseRefName?: string
+}
 
-type Issue = { url: string; description: string; attachments?: readonly string[] }
+type Issue = { url: string; description: string; state?: string; attachments?: readonly string[] }
 
 type World = {
   branch: string | null
@@ -30,6 +36,7 @@ type World = {
   pullRequests?: readonly PullRequest[]
   issues?: Readonly<Record<string, Issue>>
   linearCalls?: { count: number }
+  compare?: Readonly<Record<string, string>>
 }
 
 const ran = (exitCode: number, stdout: string) => ({
@@ -62,6 +69,13 @@ const start = async ($: Engine, on: On, world: World) => {
       return rows.length === 0 ? ran(1, '') : ran(0, `${rows.join('\n')}\n`)
     }
 
+    if (args[0] === 'api') {
+      const branch = String(args[1]).split('...').pop() ?? ''
+      const status = world.compare?.[branch]
+
+      return status === undefined ? ran(1, '') : ran(0, `${status}\n`)
+    }
+
     const url = args.find(arg => arg.startsWith('https://'))
     const pullRequest =
       url === undefined
@@ -86,6 +100,7 @@ const start = async ($: Engine, on: On, world: World) => {
             ? {
                 url: issue.url,
                 description: issue.description,
+                state: issue.state === undefined ? null : { name: issue.state },
                 attachments: { nodes: (issue.attachments ?? []).map(url => ({ url })) },
               }
             : null,
@@ -261,5 +276,84 @@ test('asks Linear nothing without an API key', { options: { workspace: 'acme' } 
 
   expect(linearCalls.count).toBe(0)
   expect(await ui.find({ type: 'Link', text: /Figma/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('shows the ticket state from Linear', { options: { linearApiKey: 'key' } }, async ($, on) => {
+  await start($, on, {
+    branch: 'liq-77-modal',
+    issues: { 'LIQ-77': { url: 'https://linear.app/acme/issue/LIQ-77/modal', description: '', state: 'In Review' } },
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Text', text: /^ In Review$/ }))?.text).toBe(' In Review')
+  await ui.unmount()
+})
+
+const MERGED = {
+  url: `${REPO}/3270`,
+  title: 'feat(wallet): LIQ-88: deposits',
+  body: '',
+  mergeCommit: { oid: 'abc123' },
+  baseRefName: 'main',
+}
+
+test('shows how far the merged pull request has deployed', { options: { workspace: 'acme', stages: 'main=dev, qa=qa, prod=prod' } }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    linked: [MERGED.url],
+    pullRequests: [MERGED],
+    compare: { qa: 'ahead', prod: 'diverged' },
+  })
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+
+    expect((await ui.find({ type: 'Text', text: /^ · on qa$/ }))?.text).toBe(' · on qa')
+    await ui.unmount()
+  }
+})
+
+test('names prod once the merge commit reaches it', { options: { workspace: 'acme', stages: 'main=dev, qa=qa, prod=prod' } }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    linked: [MERGED.url],
+    pullRequests: [MERGED],
+    compare: { qa: 'ahead', prod: 'identical' },
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Text', text: /^ · on prod$/ }))?.text).toBe(' · on prod')
+  await ui.unmount()
+})
+
+test('shows no stage when no stages are set', { options: { workspace: 'acme' } }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    linked: [MERGED.url],
+    pullRequests: [MERGED],
+    compare: { qa: 'ahead', prod: 'ahead' },
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Text', text: /· on / })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('shows no stage for an open pull request', { options: { workspace: 'acme', stages: 'main=dev, qa=qa, prod=prod' } }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    linked: [MERGED.url],
+    pullRequests: [{ ...MERGED, mergeCommit: null }],
+    compare: { qa: 'ahead', prod: 'ahead' },
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Link', text: /LIQ-88$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /· on / })).toBeUndefined()
   await ui.unmount()
 })

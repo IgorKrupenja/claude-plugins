@@ -4,8 +4,9 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Ticket } from '../types'
 
 const tickets = atom({ plugin: 'linear-link', key: 'tickets' } as const, [], {
-  shape: 'tickets-2',
+  shape: 'tickets-3',
 })
+const stage = atom({ plugin: 'linear-link', key: 'stage' } as const, null)
 
 const TITLE_IDS =
   /^(?:[\w-]+(?:\([^)]*\))?!?:\s*)?([A-Z][A-Z0-9]{0,6}-\d+(?:\s*,\s*[A-Z][A-Z0-9]{0,6}-\d+)*)\s*:/
@@ -18,16 +19,29 @@ const LINKED_PULL_REQUESTS = 3
 const FIGMA_LINKS = 3
 const PULL_REQUEST_RECHECK_MS = 5 * 60_000
 const ISSUE_RECHECK_MS = 10 * 60_000
+const STAGE_RECHECK_MS = 10 * 60_000
+const PULL_REQUEST_REPOSITORY = /github\.com\/([^/]+\/[^/]+)\/pull\/\d+/
 
-type PullRequest = { url: string; title: string; body: string; checkedAt: number }
-type Issue = { url: string | null; figma: string[]; checkedAt: number }
+type PullRequest = {
+  url: string
+  title: string
+  body: string
+  mergeCommit: string | null
+  baseBranch: string
+  checkedAt: number
+}
+type Issue = { url: string | null; state: string | null; figma: string[]; checkedAt: number }
+type Stage = { branch: string; label: string }
 
 const check = {
   workspace: '',
   linearApiKey: '',
+  stages: [] as Stage[],
   transcript: null as { sessionId: string; path: string | null } | null,
   pullRequests: new Map<string, PullRequest>(),
   issues: new Map<string, Issue>(),
+  deployed: new Map<string, { label: string | null; checkedAt: number }>(),
+  stopTimer: null as (() => void) | null,
   isRunning: false,
 }
 
@@ -100,7 +114,11 @@ const pullRequestOf = async (
   }
 
   const target = url === null ? [] : [url]
-  const json = await outputOf($, ['gh', 'pr', 'view', ...target, '--json', 'url,title,body'], 15_000)
+  const json = await outputOf(
+    $,
+    ['gh', 'pr', 'view', ...target, '--json', 'url,title,body,mergeCommit,baseRefName'],
+    15_000,
+  )
 
   if (json === null) {
     return cached ?? null
@@ -119,10 +137,13 @@ const pullRequestOf = async (
       return null
     }
 
+    const mergeCommit = (fields.mergeCommit as { oid?: unknown } | null | undefined)?.oid
     const pullRequest: PullRequest = {
       url: fields.url,
       title: fields.title,
       body: typeof fields.body === 'string' ? fields.body : '',
+      mergeCommit: typeof mergeCommit === 'string' ? mergeCommit : null,
+      baseBranch: typeof fields.baseRefName === 'string' ? fields.baseRefName : '',
       checkedAt: now,
     }
 
@@ -153,7 +174,7 @@ const issuesOf = async (
   const apiKey = stale.length > 0 ? await linearApiKeyOf($) : ''
 
   if (apiKey !== '') {
-    const fields = 'url description attachments { nodes { url } }'
+    const fields = 'url description state { name } attachments { nodes { url } }'
     const query = `{ ${stale.map((id, index) => `i${index}: issue(id: "${id}") { ${fields} }`).join(' ')} }`
 
     try {
@@ -175,9 +196,10 @@ const issuesOf = async (
           return
         }
 
-        const { url, description, attachments } = issue as {
+        const { url, description, state, attachments } = issue as {
           url?: unknown
           description?: unknown
+          state?: { name?: unknown } | null
           attachments?: { nodes?: { url?: unknown }[] }
         }
         const attachmentUrls = (attachments?.nodes ?? [])
@@ -186,6 +208,7 @@ const issuesOf = async (
 
         check.issues.set(id, {
           url: typeof url === 'string' ? url : null,
+          state: typeof state?.name === 'string' ? state.name : null,
           figma: figmaLinksIn([typeof description === 'string' ? description : '', ...attachmentUrls]),
           checkedAt: now,
         })
@@ -196,6 +219,60 @@ const issuesOf = async (
   }
 
   return check.issues
+}
+
+const stagesFrom = (text: string): Stage[] =>
+  text
+    .split(',')
+    .map(part => part.split('=').map(piece => piece.trim()))
+    .flatMap(([branch, label]) => (branch ? [{ branch, label: label || branch }] : []))
+
+const containsCommit = async (
+  $: EngineInterface,
+  repository: string,
+  commit: string,
+  branch: string,
+): Promise<boolean> => {
+  const status = (
+    await outputOf($, ['gh', 'api', `repos/${repository}/compare/${commit}...${branch}`, '--jq', '.status'], 15_000)
+  )?.trim()
+
+  return status === 'ahead' || status === 'identical'
+}
+
+const stageOf = async (
+  $: EngineInterface,
+  pullRequest: PullRequest | undefined,
+  now: number,
+): Promise<string | null> => {
+  const repository = pullRequest?.url.match(PULL_REQUEST_REPOSITORY)?.[1]
+
+  if (!pullRequest || pullRequest.mergeCommit === null || !repository || check.stages.length === 0) {
+    return null
+  }
+
+  const cached = check.deployed.get(pullRequest.url)
+  const finalLabel = check.stages.at(-1)?.label
+
+  if (cached && (cached.label === finalLabel || now - cached.checkedAt < STAGE_RECHECK_MS)) {
+    return cached.label
+  }
+
+  let label: string | null = null
+
+  for (const candidate of check.stages) {
+    const isIn =
+      candidate.branch === pullRequest.baseBranch ||
+      (await containsCommit($, repository, pullRequest.mergeCommit, candidate.branch))
+
+    if (isIn) {
+      label = candidate.label
+    }
+  }
+
+  check.deployed.set(pullRequest.url, { label, checkedAt: now })
+
+  return label
 }
 
 const idsInTitle = (title: string): string[] => title.match(TITLE_IDS)?.[1]?.match(ISSUE_ID) ?? []
@@ -237,6 +314,7 @@ const ticketsFrom = (
     id,
     url:
       links.get(id) ?? issues.get(id)?.url ?? (base ? `https://linear.app/${base}/issue/${id}` : null),
+    state: issues.get(id)?.state ?? null,
     figma: issues.get(id)?.figma ?? [],
   }))
 }
@@ -263,8 +341,10 @@ async function refresh($: EngineInterface): Promise<void> {
     const ids = ticketsFrom(pullRequests, branch, check.workspace, new Map()).map(ticket => ticket.id)
     const issues = await issuesOf($, ids, now)
     const found = ticketsFrom(pullRequests, branch, check.workspace, issues)
+    const deployed = await stageOf($, pullRequests.at(-1), now)
 
     await update($, tickets, previous => (isSame(previous, found) ? previous : found))
+    await update($, stage, () => deployed)
   } finally {
     check.isRunning = false
   }
@@ -276,14 +356,26 @@ function refreshSoon($: EngineInterface): void {
   })
 }
 
+function refreshEvery($: EngineInterface): void {
+  check.stopTimer?.()
+
+  const timer = $.clock.every(STAGE_RECHECK_MS, () => {
+    void refresh($).catch(() => undefined)
+  })
+
+  check.stopTimer = () => timer.cancel()
+}
+
 export const register: Register = (on, options) => {
   check.workspace = typeof options.workspace === 'string' ? options.workspace.trim() : ''
   check.linearApiKey = typeof options.linearApiKey === 'string' ? options.linearApiKey.trim() : ''
+  check.stages = stagesFrom(typeof options.stages === 'string' ? options.stages : '')
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
     refreshSoon($)
+    refreshEvery($)
 
     return started
   })
@@ -302,6 +394,7 @@ export const register: Register = (on, options) => {
     }
 
     const list = await read($, tickets)
+    const deployed = await read($, stage)
 
     if (list.length === 0) {
       return next(e)
@@ -311,18 +404,23 @@ export const register: Register = (on, options) => {
     const parts = list.flatMap((ticket, index) => {
       const label =
         ticket.url === null ? <Text>{ticket.id}</Text> : <Link href={ticket.url}>{ticket.id}</Link>
+      const state = ticket.state === null ? [] : [<Text dimColor> {ticket.state}</Text>]
       const designs = ticket.figma.flatMap((href, figmaIndex) => [
         <Text dimColor> · </Text>,
         <Link href={href}>{ticket.figma.length === 1 ? 'Figma' : `Figma ${figmaIndex + 1}`}</Link>,
       ])
 
-      return index === 0 ? [label, ...designs] : [<Text dimColor> · </Text>, label, ...designs]
+      return index === 0
+        ? [label, ...state, ...designs]
+        : [<Text dimColor> · </Text>, label, ...state, ...designs]
     })
+    const stageText = deployed === null ? [] : [<Text dimColor> · on {deployed}</Text>]
 
     return (
       <Text>
         <Text dimColor>Linear </Text>
         {parts}
+        {stageText}
       </Text>
     )
   })
