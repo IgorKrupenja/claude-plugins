@@ -1,6 +1,6 @@
 {
-  "name": "session-banners",
-  "description": "macOS banners for Claude desktop app sessions",
+  "name": "igor-plugins",
+  "description": "Claude Code plugins for the Claude desktop app",
   "owner": {
     "name": "Igor Krupenja"
   },
@@ -9,6 +9,11 @@
       "name": "session-banners",
       "source": "./plugins/session-banners",
       "description": "macOS banners when a Claude desktop app session finishes, opening the session on click"
+    },
+    {
+      "name": "linear-link",
+      "source": "./plugins/linear-link",
+      "description": "The session's Linear ticket as a link above the message box, read from the pull request title or the branch name"
     }
   ]
 }

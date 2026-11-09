@@ -1,0 +1,19 @@
+{
+  "name": "linear-link",
+  "version": "0.1.0",
+  "description": "The session's Linear ticket as a link above the message box, read from the pull request title or the branch name",
+  "author": {
+    "name": "Igor Krupenja"
+  },
+  "homepage": "https://github.com/IgorKrupenja/claude-notify",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "workspace": {
+      "type": "string",
+      "title": "Linear workspace",
+      "description": "The workspace's URL key, the acme in linear.app/acme/issue/ACME-1, for a link before the pull request body carries one",
+      "default": ""
+    }
+  }
+}
