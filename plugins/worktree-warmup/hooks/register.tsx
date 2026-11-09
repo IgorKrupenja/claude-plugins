@@ -45,8 +45,6 @@ const lastLineOf = (text: string): string =>
 const scriptFor = (donePath: string, command: string): string =>
   [
     'if [ -f .nvmrc ] && [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; nvm use >/dev/null 2>&1; fi',
-    'if ! command -v pnpm >/dev/null 2>&1; then for bin in "$HOME"/.nvm/versions/node/*/bin "$HOME/Library/pnpm" "$HOME/.local/share/pnpm"; do if [ -x "$bin/pnpm" ]; then PATH="$PATH:$bin"; break; fi; done; fi',
-    'command -v pnpm >/dev/null 2>&1 || pnpm() { npx --yes pnpm "$@"; }',
     `( ${command} ) 2>&1`,
     'code=$?',
     `echo "$code" > ${quoted(donePath)}`,

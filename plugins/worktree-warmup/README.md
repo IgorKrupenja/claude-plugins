@@ -6,7 +6,7 @@ worktree, in the background, and shows its progress above the message box.
 
 - **Ready before you need it:** in a worktree that has `pnpm-lock.yaml` and no `node_modules`, it
   runs the setup command from the worktree's root, under the node version `.nvmrc` names when
-  nvm is installed. It finds `pnpm` even when that node version has none of its own.
+  nvm is installed, so that version needs its own `pnpm`.
 - **Progress where you look:** `Setting up this worktree` with pnpm's latest line while it runs,
   `Worktree ready in 38s` for half a minute when it is done, and `Worktree setup failed` with the
   last line and a Retry button when it is not. The full output lands in the worktree's git
