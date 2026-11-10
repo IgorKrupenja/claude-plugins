@@ -227,7 +227,7 @@ export const register: Register = (on, options) => {
     let row = <Text dimColor>Worktree ready in {seconds}s</Text>
 
     if (current.status === 'running') {
-      row = <Text dimColor>Setting up this worktree: {current.lastLine || 'starting'}</Text>
+      row = <Text dimColor>Setting up worktree: {current.lastLine || 'starting'}</Text>
     }
 
     if (current.status === 'failed') {

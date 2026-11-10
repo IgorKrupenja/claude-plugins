@@ -163,8 +163,8 @@ test('makes a command that needs dependencies wait for the setup', async ($, on)
   const { clock, commands } = await start($, on, { gate })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
-  expect((await ui.find({ type: 'Text', text: /^Setting up this worktree/ }))?.text).toBe(
-    'Setting up this worktree: starting',
+  expect((await ui.find({ type: 'Text', text: /^Setting up worktree/ }))?.text).toBe(
+    'Setting up worktree: starting',
   )
   await ui.unmount()
 

@@ -4,20 +4,20 @@ A new git worktree starts with no dependencies, so the first test run, push or `
 waits on an install. This plugin starts that install the moment a session opens in a new
 worktree, in the background, and shows its progress above the message box.
 
-<img src="images/row.png" width="850" alt="Above the message box: the status-bar row, then Setting up this worktree with pnpm's progress">
+<img src="images/row.png" width="850" alt="Above the message box: the status-bar row, then Setting up worktree with pnpm's progress">
 
 - **Ready before you need it:** in a worktree that has `pnpm-lock.yaml` and no current install
   (no `node_modules`, one older than the lockfile, or a generated file missing, as a reused
   worktree often has), it runs the setup command from the worktree's root, under the node
   version `.nvmrc` names when nvm is installed, so that version needs its own `pnpm`.
-- **Progress where you look:** `Setting up this worktree` with pnpm's latest line while it runs,
+- **Progress where you look:** `Setting up worktree` with pnpm's latest line while it runs,
   `Worktree ready in 38s` for half a minute when it is done, and `Worktree setup failed` with the
   last line and a Retry button when it is not. The full output lands in the worktree's git
   folder, `.git/worktrees/<name>/worktree-warmup.log`.
 - **No races:** while it runs, a command of Claude's that needs the dependencies (`pnpm`, `node`,
   `tsc`, `vitest`, `turbo`, `scripts/stack`, ...) waits for the setup to finish before it starts.
 - **Shares the row:** whatever other plugins show above the message box, such as status-bar,
-  stays there below its line.
+  keeps its own line in the same row.
 
 ## Install
 
