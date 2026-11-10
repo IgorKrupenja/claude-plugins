@@ -1,6 +1,6 @@
 {
   "name": "session-banners",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "macOS banners when a Claude desktop app session finishes, opening the session on click",
   "author": {
     "name": "Igor Krupenja"

@@ -42,6 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let sound     = args.count > 3 ? args[3] : nil
         let bundleID  = args.count > 4 ? args[4] : "com.anthropic.claudefordesktop"
         let clickURL  = args.count > 5 ? args[5] : ""
+        let bannerID  = args.count > 6 ? args[6] : ""
 
         let appFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier?
             .lowercased().contains(bundleID.lowercased()) ?? false
@@ -64,8 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: name))
             }
 
-            // One banner per click target: a session's new banner replaces its previous one
-            let identifier = clickURL.isEmpty ? UUID().uuidString : clickURL
+            // One banner per click target, unless the caller names its own: a session's new banner
+            // replaces its previous one, while a named banner sits beside it
+            let identifier = !bannerID.isEmpty ? bannerID : (clickURL.isEmpty ? UUID().uuidString : clickURL)
             let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
             center.add(request) { error in
                 if let error { fputs("Error: \(error)\n", stderr) }

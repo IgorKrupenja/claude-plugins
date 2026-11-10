@@ -23,6 +23,12 @@ the message box, in every session that works on a ticket.
   ticket's own URL from Linear, or `linear.app/<workspace>/issue/<id>`.
 - **Keeps up by itself:** it checks again after every turn, so a new branch or a new pull request
   shows up without a restart.
+- **Tells you what happened to the pull request:** with `watchPullRequests` on, it checks the
+  session's pull request every minute. When it is approved by someone else, leaves the merge
+  queue, turns ready to merge with auto-merge off, merges or closes, and when each deploy stage
+  succeeds or fails, you get a macOS banner through session-banners' helper app (a click opens
+  the session) and a dim note in the session. Nothing is sent in your name and no reply starts;
+  with `tellClaude` on, Claude also reads the event with your next message.
 
 ## Requirements
 
@@ -53,6 +59,13 @@ pipe a JSON object to `claude plugin configure status-bar@igor-plugins --values-
   request number, such as `Preview=https://pr-{number}.preview.example.com`. Both empty, the
   default, hides the preview.
 - `previewIdleHours`: how long after its last deploy a preview is torn down, 48 by default.
+- `watchPullRequests`: banners and notes for the pull request's events, off by default.
+- `bannerApp`: the session-banners helper app the banners go through,
+  `~/.claude/plugins/data/session-banners-igor-plugins/Claude Notify.app` by default.
+- `tellClaude`: also leave each event where Claude reads it with your next message, off by
+  default.
+- `deployWorkflow`: the workflow whose push runs on each `stages` branch deploy it,
+  `deploy.yml` by default, for the deploy events.
 
 ## Develop
 
