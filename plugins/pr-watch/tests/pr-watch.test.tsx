@@ -6,11 +6,12 @@ const URL = 'https://github.com/acme/app/pull/3268'
 const START = Date.parse('2026-11-09T12:00:00Z')
 const MERGE_SHA = 'mergesha1'
 const APP = '/home/me/.claude/plugins/data/session-banners-igor-plugins/Claude Notify.app'
-const WATCHING = { watchPullRequests: true, stages: 'main=dev, qa=qa, prod=prod', bannerApp: APP }
+const WATCHING = { stages: 'main=dev, qa=qa, prod=prod', bannerApp: APP }
 
 type PullRequestState = Record<string, unknown>
 
 type World = {
+  isLinked?: boolean
   states: readonly PullRequestState[]
   runs?: Readonly<Record<string, readonly string[]>>
 }
@@ -72,7 +73,7 @@ const start = async ($: Engine, on: On, world: World) => {
     }
 
     if (command === 'grep') {
-      return joined.includes('pr-link')
+      return joined.includes('pr-link') && world.isLinked !== false
         ? ran(0, `{"type":"pr-link","sessionId":"s1","prNumber":3268,"prUrl":"${URL}","prRepository":"acme/app"}\n`)
         : ran(1, '')
     }
@@ -227,8 +228,8 @@ test('posts a pull request leaving the merge queue', { options: WATCHING }, asyn
   expect(notes()).toEqual(['PR #3268 left the merge queue without merging at 12:03 UTC'])
 })
 
-test('watches nothing unless switched on', async ($, on) => {
-  const { notes, banners, tick, graphqlCalls } = await start($, on, { states: [open()] })
+test('watches nothing while the session has no pull request', { options: WATCHING }, async ($, on) => {
+  const { notes, banners, tick, graphqlCalls } = await start($, on, { isLinked: false, states: [open()] })
 
   await tick()
   await tick()
@@ -249,7 +250,7 @@ test('leaves Claude a note it reads only when asked to', { options: { ...WATCHIN
     .filter(row => row.message.type === 'user')
     .map(row => row.message.content.map(block => ('text' in block ? String(block.text) : '')).join(''))
 
-  expect(forClaude).toEqual(['PR watch (status-bar): PR #3268 merged at 12:01 UTC'])
+  expect(forClaude).toEqual(['PR watch: PR #3268 merged at 12:01 UTC'])
 })
 
 test('skips the banner when the helper app is missing', { options: { ...WATCHING, bannerApp: '/nowhere/Claude Notify.app' } }, async ($, on) => {

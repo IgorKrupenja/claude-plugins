@@ -1,0 +1,36 @@
+{
+  "name": "pr-watch",
+  "version": "0.1.0",
+  "description": "A macOS banner and a note in the session when the session's pull request is approved, turns ready to merge, leaves the merge queue, merges, closes, or deploys or fails to deploy, never a message in your name",
+  "author": {
+    "name": "Igor Krupenja"
+  },
+  "homepage": "https://github.com/IgorKrupenja/claude-plugins",
+  "license": "MIT",
+  "userConfig": {
+    "stages": {
+      "type": "string",
+      "title": "Deploy stages",
+      "description": "Branches a merged pull request moves through, in order, as branch=label pairs: main=dev, qa=qa, prod=prod. Empty, the default, skips the deploy events.",
+      "default": ""
+    },
+    "deployWorkflow": {
+      "type": "string",
+      "title": "Deploy workflow",
+      "description": "The workflow file whose push runs on each stage branch deploy it",
+      "default": "deploy.yml"
+    },
+    "bannerApp": {
+      "type": "string",
+      "title": "Banner app",
+      "description": "The session-banners helper app that shows the banners; a path that does not exist means notes only",
+      "default": "~/.claude/plugins/data/session-banners-igor-plugins/Claude Notify.app"
+    },
+    "tellClaude": {
+      "type": "boolean",
+      "title": "Tell Claude",
+      "description": "Also leave each event where Claude reads it with your next message, without starting a reply",
+      "default": false
+    }
+  }
+}

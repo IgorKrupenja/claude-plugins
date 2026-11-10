@@ -1,7 +1,7 @@
 {
   "name": "session-banners",
   "version": "1.1.0",
-  "description": "macOS banners when a Claude desktop app session finishes, opening the session on click",
+  "description": "A macOS banner when a Claude desktop app session finishes, opening that session on click; its helper app also shows pr-watch's banners",
   "author": {
     "name": "Igor Krupenja"
   },

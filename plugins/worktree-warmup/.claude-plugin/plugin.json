@@ -1,7 +1,7 @@
 {
   "name": "worktree-warmup",
   "version": "0.2.0",
-  "description": "Installs a new worktree's dependencies in the background the moment its session starts, with progress above the message box",
+  "description": "Installs a new or stale worktree's dependencies in the background when its session starts, with progress above the message box; Claude's commands that need them wait",
   "author": {
     "name": "Igor Krupenja"
   },

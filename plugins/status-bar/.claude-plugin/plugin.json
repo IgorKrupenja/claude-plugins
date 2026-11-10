@@ -1,7 +1,7 @@
 {
   "name": "status-bar",
-  "version": "0.7.0",
-  "description": "The session's Linear ticket with its state and Figma frames, its pull request's preview and deploy stage, as links above the message box",
+  "version": "0.8.0",
+  "description": "A row above the message box with the session's Linear ticket, its state and Figma frames, the pull request's preview links, and how far the merged change has deployed",
   "author": {
     "name": "Igor Krupenja"
   },
@@ -45,30 +45,6 @@
       "title": "Preview lifetime (hours)",
       "description": "Hours after its last deploy that a preview is torn down; an older preview is not shown.",
       "default": 48
-    },
-    "watchPullRequests": {
-      "type": "boolean",
-      "title": "Watch pull requests",
-      "description": "Tell you when the session's pull request is approved, leaves the merge queue, turns ready to merge with auto-merge off, merges, closes, or deploys or fails to deploy to each stage: a macOS banner and a note in the session, never a message in your name",
-      "default": false
-    },
-    "deployWorkflow": {
-      "type": "string",
-      "title": "Deploy workflow",
-      "description": "The workflow file whose push runs on each stage branch deploy it, for the watch's deploy events",
-      "default": "deploy.yml"
-    },
-    "bannerApp": {
-      "type": "string",
-      "title": "Banner app",
-      "description": "The session-banners helper app that shows the watch's banners; a path that does not exist means no banners",
-      "default": "~/.claude/plugins/data/session-banners-igor-plugins/Claude Notify.app"
-    },
-    "tellClaude": {
-      "type": "boolean",
-      "title": "Tell Claude",
-      "description": "Also leave each event where Claude reads it with your next message, without starting a reply",
-      "default": false
     }
   }
 }

@@ -8,17 +8,22 @@
     {
       "name": "session-banners",
       "source": "./plugins/session-banners",
-      "description": "macOS banners when a Claude desktop app session finishes, opening the session on click"
+      "description": "A macOS banner when a Claude desktop app session finishes, opening that session on click; its helper app also shows pr-watch's banners"
     },
     {
       "name": "status-bar",
       "source": "./plugins/status-bar",
-      "description": "The session's Linear ticket with its state and Figma frames, its pull request's preview and deploy stage, as links above the message box"
+      "description": "A row above the message box with the session's Linear ticket, its state and Figma frames, the pull request's preview links, and how far the merged change has deployed"
+    },
+    {
+      "name": "pr-watch",
+      "source": "./plugins/pr-watch",
+      "description": "A macOS banner and a note in the session when the session's pull request is approved, turns ready to merge, leaves the merge queue, merges, closes, or deploys or fails to deploy, never a message in your name"
     },
     {
       "name": "worktree-warmup",
       "source": "./plugins/worktree-warmup",
-      "description": "Installs a new worktree's dependencies in the background the moment its session starts, with progress above the message box"
+      "description": "Installs a new or stale worktree's dependencies in the background when its session starts, with progress above the message box; Claude's commands that need them wait"
     }
   ]
 }

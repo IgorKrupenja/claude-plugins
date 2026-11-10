@@ -37,6 +37,8 @@ you dismiss them, set Claude Notify to Persistent in System Settings > Notificat
 - A `Stop` hook, [`stop-hook.py`](scripts/stop-hook.py), launches the helper with the banner text
   and the session's `claude://` link. When a turn ends with a question, it leaves the banner to
   the app, which shows its own for those.
+- Other plugins post through the same helper: [pr-watch](../pr-watch) passes a seventh argument,
+  its own banner ID, so its banners sit beside the session's instead of replacing them.
 
 ## Uninstall
 
