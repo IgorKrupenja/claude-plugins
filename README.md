@@ -10,6 +10,8 @@ first line of Claude's reply. One click opens that exact session, however many y
 It stays quiet while you are in the Claude app. Its small helper app also shows pr-watch's banners.
 [More](plugins/session-banners)
 
+<img src="plugins/session-banners/images/banner.png" width="349" alt="A banner with the session title over the first line of Claude's reply">
+
 ## status-bar
 
 A row of links above the message box, next to the pull request the app already shows:
@@ -26,6 +28,8 @@ It finds the ticket in the pull request title, the branch name or the first Line
 A macOS banner and a dim note in the session when the session's pull request is approved, turns
 ready to merge, leaves the merge queue, merges or closes, and when each deploy stage succeeds or
 fails. Nothing is sent in your name and no reply starts. [More](plugins/pr-watch)
+
+<img src="plugins/pr-watch/images/banner.png" width="349" alt="A banner with the session title over PR #42 deployed to qa">
 
 ## worktree-warmup
 

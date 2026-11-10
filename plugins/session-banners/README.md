@@ -3,6 +3,8 @@
 Never miss a finished Claude session. When a session in the Claude desktop app finishes, a macOS
 banner tells you, and one click takes you straight back to it.
 
+<img src="images/banner.png" width="349" alt="A banner with the session title over the first line of Claude's reply">
+
 - **Jump right back in:** clicking the banner opens the exact session that finished, however many
   you have running.
 - **See what happened at a glance:** the banner shows the session's title and the first line of
