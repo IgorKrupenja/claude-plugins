@@ -6,6 +6,8 @@ macOS banner and a dim note in that session.
 
 <img src="images/banner.png" width="349" alt="A banner with the session title over PR #42 deployed to qa">
 
+**Screenshot missing: the note in the session.**
+
 - **Approved:** someone other than the author approves it.
 - **Ready to merge:** a new commit is approved with every check green while auto-merge is off.
 - **Left the merge queue:** it drops out of the queue without merging.

@@ -5,6 +5,8 @@ know: the session's Linear ticket, its state, its designs, the pull request's pr
 far the change has shipped, in a `Linear LIQ-123 In Review · Figma · Preview · Admin` row above
 the message box, in every session that works on a ticket.
 
+<img src="images/row.png" width="858" alt="The row above the message box: Linear LIQ-4000 Done, Figma 1, Figma 2">
+
 - **Read from what you already write:** the ticket IDs come from the title of the pull request
   the app shows for the session (`feat(api): LIQ-123: ...`, several IDs work too), then the
   current branch's pull request, then the branch name (`liq-123-...`), then the first Linear link

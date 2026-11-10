@@ -23,6 +23,8 @@ A row of links above the message box, next to the pull request the app already s
 It finds the ticket in the pull request title, the branch name or the first Linear link you sent.
 [More](plugins/status-bar)
 
+<img src="plugins/status-bar/images/row.png" width="858" alt="The row above the message box: Linear LIQ-4000 Done, Figma 1, Figma 2">
+
 ## pr-watch
 
 A macOS banner and a dim note in the session when the session's pull request is approved, turns
@@ -31,12 +33,16 @@ fails. Nothing is sent in your name and no reply starts. [More](plugins/pr-watch
 
 <img src="plugins/pr-watch/images/banner.png" width="349" alt="A banner with the session title over PR #42 deployed to qa">
 
+**Screenshot missing: the note in the session.**
+
 ## worktree-warmup
 
 When a session opens in a new or reused worktree whose install is missing or stale, it installs the
 dependencies in the background and shows its progress above the message box, ending with
 `Worktree ready` or a failure with a Retry button. Claude's commands that need the dependencies
 wait for it. [More](plugins/worktree-warmup)
+
+**Screenshot missing: the progress row above the message box.**
 
 ## Install
 
