@@ -42,7 +42,7 @@ dependencies in the background and shows its progress above the message box, end
 `Worktree ready` or a failure with a Retry button. Claude's commands that need the dependencies
 wait for it. [More](plugins/worktree-warmup)
 
-**Screenshot missing: the progress row above the message box.**
+<img src="plugins/worktree-warmup/images/row.png" width="850" alt="Above the message box: the status-bar row, then Setting up this worktree with pnpm's progress">
 
 ## Install
 
