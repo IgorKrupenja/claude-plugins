@@ -24,7 +24,7 @@ const PULL_REQUEST_RECHECK_MS = 5 * 60_000
 const ISSUE_RECHECK_MS = 10 * 60_000
 const STAGE_RECHECK_MS = 10 * 60_000
 const PULL_REQUEST_REPOSITORY = /github\.com\/([^/]+\/[^/]+)\/pull\/\d+/
-const PREVIEW_RECHECK_MS = 60_000
+const PREVIEW_RECHECK_MS = 20_000
 const PREVIEW_RUNS = 20
 const HOUR_MS = 60 * 60_000
 

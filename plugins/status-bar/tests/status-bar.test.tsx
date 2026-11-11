@@ -560,7 +560,7 @@ test('notices a redeploy that starts after the turn', { options: PREVIEW_OPTIONS
   expect(await ui.find({ type: 'Link', text: /Redeploying$/ })).toBeUndefined()
 
   world.runs = [{ ...NEWER_RUN, status: 'queued', conclusion: '' }, RUN]
-  await clock.advance(60_000)
+  await clock.advance(20_000)
 
   expect((await ui.find({ type: 'Link', text: /Redeploying$/ }))?.props.href).toBe(NEWER_RUN.url)
   expect((await ui.find({ type: 'Link', text: /Preview$/ }))?.props.href).toBe('https://pr-3268.preview.acme.dev')

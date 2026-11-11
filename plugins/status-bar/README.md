@@ -27,8 +27,8 @@ as `Redeploying`.
 - **The preview, live:** while the pull request is open, its preview links show once a preview
   workflow run has succeeded. A newer commit's run shows beside them as `Redeploying`, or
   `Redeploy failed` when it broke; before the first deploy it is `Preview deploying` or
-  `Preview failed`. Each opens its run, and the preview is checked every minute. A preview past its
-  lifetime, or torn down, drops off.
+  `Preview failed`. Each opens its run, and the preview is checked every 20 seconds. A preview
+  past its lifetime, or torn down, drops off.
 - **Where it has shipped:** once the pull request merges, `on dev`, `on qa` or `on prod` says the
   furthest deploy branch its merge commit has reached, checked every ten minutes.
 - **The exact ticket page:** the link is the Linear URL the pull request body carries, the
