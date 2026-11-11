@@ -25,6 +25,10 @@ It finds the ticket in the pull request title, the branch name or the first Line
 
 <img src="plugins/status-bar/images/row.png" width="858" alt="The row above the message box: Linear LIQ-4000 Done, Figma 1, Figma 2">
 
+<img src="plugins/status-bar/images/preview-deploying.png" width="850" alt="The row while the preview deploys: Linear LIQ-5463 Dev In Progress, Preview deploying">
+
+`Preview deploying` opens the preview's deploy run on GitHub.
+
 ## pr-watch
 
 A macOS banner and a dim note in the session when the session's pull request is approved, turns
