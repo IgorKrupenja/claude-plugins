@@ -54,6 +54,10 @@ wait for it. [More](plugins/worktree-warmup)
 
 <img src="plugins/worktree-warmup/images/row.png" width="850" alt="Above the message box: the status-bar row, then Setting up worktree with pnpm's progress">
 
+<img src="plugins/worktree-warmup/images/ready.png" width="855" alt="Worktree ready in 31s">
+
+When the install is done, `Worktree ready` shows for half a minute.
+
 ## Install
 
 Add the marketplace once, then install the plugins you want:

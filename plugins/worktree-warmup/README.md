@@ -6,6 +6,10 @@ worktree, in the background, and shows its progress above the message box.
 
 <img src="images/row.png" width="850" alt="Above the message box: the status-bar row, then Setting up worktree with pnpm's progress">
 
+<img src="images/ready.png" width="855" alt="Worktree ready in 31s">
+
+When the install is done, `Worktree ready` shows for half a minute.
+
 - **Ready before you need it:** in a worktree that has `pnpm-lock.yaml` and no current install
   (no `node_modules`, one older than the lockfile, or a generated file missing, as a reused
   worktree often has), it runs the setup command from the worktree's root, under the node
