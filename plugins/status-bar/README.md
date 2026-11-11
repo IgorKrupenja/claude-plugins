@@ -13,7 +13,8 @@ the message box, in every session that works on a ticket.
 
 <img src="images/preview-ready.png" width="851" alt="The row once the preview is up: Linear LIQ-5463 Dev In Progress, Preview, Admin">
 
-Once the preview is up, its links take that place.
+Once the preview is up, its links take that place, and a newer commit's deploy shows beside them
+as `Redeploying`.
 
 - **Read from what you already write:** the ticket IDs come from the title of the pull request
   the app shows for the session (`feat(api): LIQ-123: ...`, several IDs work too), then the
@@ -23,10 +24,11 @@ Once the preview is up, its links take that place.
 - **The design one click away:** with a Linear API key, every Figma frame the ticket links, in
   its description or as an attachment, gets its own `Figma` link next to the ticket, after the
   ticket's state (`In Review`, `QA`, `Done`).
-- **The preview, live:** while the pull request is open, its preview links show once the
-  newest preview workflow run succeeded, `Preview deploying` links the run while it goes (checked
-  every minute), and `Preview failed` links the run that broke. A preview past its lifetime, or
-  torn down, drops off.
+- **The preview, live:** while the pull request is open, its preview links show once a preview
+  workflow run has succeeded. A newer commit's run shows beside them as `Redeploying`, or
+  `Redeploy failed` when it broke; before the first deploy it is `Preview deploying` or
+  `Preview failed`. Each opens its run, and the preview is checked every minute. A preview past its
+  lifetime, or torn down, drops off.
 - **Where it has shipped:** once the pull request merges, `on dev`, `on qa` or `on prod` says the
   furthest deploy branch its merge commit has reached, checked every ten minutes.
 - **The exact ticket page:** the link is the Linear URL the pull request body carries, the

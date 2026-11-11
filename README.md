@@ -17,7 +17,8 @@ It stays quiet while you are in the Claude app. Its small helper app also shows 
 A row of links above the message box, next to the pull request the app already shows:
 
 - the session's Linear ticket, its state and the Figma frames it links
-- the open pull request's preview links, or `Preview deploying` and `Preview failed` with the run
+- the open pull request's preview links, with `Redeploying` while a newer commit deploys, or
+  `Preview deploying` and `Preview failed` with the run
 - after the merge, how far the change has shipped: `on dev`, `on qa` or `on prod`
 
 It finds the ticket in the pull request title, the branch name or the first Linear link you sent.
@@ -31,7 +32,8 @@ It finds the ticket in the pull request title, the branch name or the first Line
 
 <img src="plugins/status-bar/images/preview-ready.png" width="851" alt="The row once the preview is up: Linear LIQ-5463 Dev In Progress, Preview, Admin">
 
-Once the preview is up, its links take that place.
+Once the preview is up, its links take that place, and a newer commit's deploy shows beside them
+as `Redeploying`.
 
 ## pr-watch
 

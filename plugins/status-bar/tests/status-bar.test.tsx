@@ -158,6 +158,8 @@ const start = async ($: Engine, on: On, world: World) => {
 
   await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
   await clock.advance(1)
+
+  return clock
 }
 
 test('links the ticket of the pull request the session is bound to', async ($, on) => {
@@ -494,6 +496,74 @@ test('shows no preview once the newest run is the teardown', { options: PREVIEW_
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
   expect(await ui.find({ type: 'Link', text: /Preview/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+const NEWER_RUN = { ...RUN, createdAt: '2026-11-09T11:50:00Z', url: 'https://github.com/acme/app/actions/runs/8' }
+
+test('keeps the preview links while a newer commit redeploys', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...NEWER_RUN, status: 'in_progress', conclusion: '' }, RUN],
+  })
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+
+    expect((await ui.find({ type: 'Link', text: /Admin$/ }))?.props.href).toBe('https://pr-3268.admin.preview.acme.dev')
+    expect((await ui.find({ type: 'Link', text: /Redeploying$/ }))?.props.href).toBe(NEWER_RUN.url)
+    expect(await ui.find({ type: 'Link', text: /Preview deploying$/ })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('keeps the preview links when a redeploy fails', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...NEWER_RUN, conclusion: 'failure' }, RUN],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Link', text: /Preview$/ }))?.props.href).toBe('https://pr-3268.preview.acme.dev')
+  expect((await ui.find({ type: 'Link', text: /Redeploy failed$/ }))?.props.href).toBe(NEWER_RUN.url)
+  await ui.unmount()
+})
+
+test('drops the links of a preview swept before the next deploy', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  await start($, on, {
+    branch: null,
+    now: NOW,
+    linked: [OPEN.url],
+    pullRequests: [OPEN],
+    runs: [{ ...NEWER_RUN, status: 'in_progress', conclusion: '' }, { ...RUN, createdAt: '2026-11-06T09:00:00Z' }],
+  })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Link', text: /Preview deploying$/ }))?.props.href).toBe(NEWER_RUN.url)
+  expect(await ui.find({ type: 'Link', text: /Admin$/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('notices a redeploy that starts after the turn', { options: PREVIEW_OPTIONS }, async ($, on) => {
+  const world: World = { branch: null, now: NOW, linked: [OPEN.url], pullRequests: [OPEN], runs: [RUN] }
+  const clock = await start($, on, world)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Link', text: /Redeploying$/ })).toBeUndefined()
+
+  world.runs = [{ ...NEWER_RUN, status: 'queued', conclusion: '' }, RUN]
+  await clock.advance(60_000)
+
+  expect((await ui.find({ type: 'Link', text: /Redeploying$/ }))?.props.href).toBe(NEWER_RUN.url)
+  expect((await ui.find({ type: 'Link', text: /Preview$/ }))?.props.href).toBe('https://pr-3268.preview.acme.dev')
   await ui.unmount()
 })
 

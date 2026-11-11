@@ -24,7 +24,8 @@ const PULL_REQUEST_RECHECK_MS = 5 * 60_000
 const ISSUE_RECHECK_MS = 10 * 60_000
 const STAGE_RECHECK_MS = 10 * 60_000
 const PULL_REQUEST_REPOSITORY = /github\.com\/([^/]+\/[^/]+)\/pull\/\d+/
-const DEPLOYING_RECHECK_MS = 60_000
+const PREVIEW_RECHECK_MS = 60_000
+const PREVIEW_RUNS = 20
 const HOUR_MS = 60 * 60_000
 
 type PullRequest = {
@@ -55,8 +56,11 @@ const check = {
   issues: new Map<string, Issue>(),
   deployed: new Map<string, { label: string | null; checkedAt: number }>(),
   stopTimer: null as (() => void) | null,
+  cancelLater: null as (() => void) | null,
   isRunning: false,
 }
+
+type PreviewRun = { status: string; conclusion: string; event: string; createdAt: number; url: string }
 
 const outputOf = async (
   $: EngineInterface,
@@ -393,51 +397,72 @@ const previewOf = async (
       '--branch',
       pullRequest.headBranch,
       '--limit',
-      '1',
+      String(PREVIEW_RUNS),
       '--json',
       'status,conclusion,event,createdAt,url',
     ],
     15_000,
   )
+  const runs = previewRunsFrom(json)
+  const newest = runs[0]
 
-  try {
-    const [run] = JSON.parse(json ?? '[]') as {
-      status?: unknown
-      conclusion?: unknown
-      event?: unknown
-      createdAt?: unknown
-      url?: unknown
-    }[]
-
-    if (!run || run.event !== 'workflow_dispatch' || typeof run.url !== 'string') {
-      return null
-    }
-
-    if (run.status !== 'completed') {
-      return { status: 'deploying', runUrl: run.url, links: [] }
-    }
-
-    if (run.conclusion !== 'success') {
-      return { status: 'failed', runUrl: run.url, links: [] }
-    }
-
-    const startedAt = typeof run.createdAt === 'string' ? Date.parse(run.createdAt) : Number.NaN
-
-    if (!Number.isFinite(startedAt) || now - startedAt > check.previewIdleMs) {
-      return null
-    }
-
-    return {
-      status: 'ready',
-      runUrl: run.url,
-      links: check.previewLinks.map(({ label, template }) => ({
-        label,
-        href: template.replaceAll('{number}', String(pullRequest.number)),
-      })),
-    }
-  } catch {
+  if (!newest || newest.event !== 'workflow_dispatch' || now - newest.createdAt > check.previewIdleMs) {
     return null
   }
+
+  const links = isPreviewUp(runs)
+    ? check.previewLinks.map(({ label, template }) => ({
+        label,
+        href: template.replaceAll('{number}', String(pullRequest.number)),
+      }))
+    : []
+
+  if (newest.status !== 'completed') {
+    return { status: 'deploying', runUrl: newest.url, links }
+  }
+
+  if (newest.conclusion !== 'success') {
+    return { status: 'failed', runUrl: newest.url, links }
+  }
+
+  return { status: 'ready', runUrl: newest.url, links }
+}
+
+const previewRunsFrom = (json: string | null): PreviewRun[] => {
+  try {
+    const parsed = JSON.parse(json ?? '[]') as unknown
+
+    return (Array.isArray(parsed) ? parsed : []).flatMap((run: Record<string, unknown>) => {
+      const createdAt = typeof run.createdAt === 'string' ? Date.parse(run.createdAt) : Number.NaN
+
+      return typeof run.url === 'string' && Number.isFinite(createdAt)
+        ? [
+            {
+              status: String(run.status ?? ''),
+              conclusion: String(run.conclusion ?? ''),
+              event: String(run.event ?? ''),
+              createdAt,
+              url: run.url,
+            },
+          ]
+        : []
+    })
+  } catch {
+    return []
+  }
+}
+
+const isPreviewUp = (runs: readonly PreviewRun[]): boolean => {
+  const teardown = runs.findIndex(run => run.event !== 'workflow_dispatch')
+  const sinceTeardown = teardown === -1 ? runs : runs.slice(0, teardown)
+  const deployed = sinceTeardown.findIndex(run => run.status === 'completed' && run.conclusion === 'success')
+
+  return (
+    deployed !== -1 &&
+    sinceTeardown
+      .slice(1, deployed + 1)
+      .every((run, index) => (sinceTeardown[index]?.createdAt ?? run.createdAt) - run.createdAt <= check.previewIdleMs)
+  )
 }
 
 const idsInTitle = (title: string): string[] => title.match(TITLE_IDS)?.[1]?.match(ISSUE_ID) ?? []
@@ -489,6 +514,18 @@ const ticketsFrom = (
   }))
 }
 
+const previewRunLabel = (status: Preview['status'], isUp: boolean): string | null => {
+  if (status === 'deploying') {
+    return isUp ? 'Redeploying' : 'Preview deploying'
+  }
+
+  if (status === 'failed') {
+    return isUp ? 'Redeploy failed' : 'Preview failed'
+  }
+
+  return null
+}
+
 const isSame = (a: readonly Ticket[], b: readonly Ticket[]): boolean =>
   JSON.stringify(a) === JSON.stringify(b)
 
@@ -523,8 +560,8 @@ async function refresh($: EngineInterface): Promise<void> {
       JSON.stringify(previous) === JSON.stringify(deployment) ? previous : deployment,
     )
 
-    if (deployment?.status === 'deploying') {
-      refreshLater($, DEPLOYING_RECHECK_MS)
+    if (deployment !== null) {
+      refreshLater($, PREVIEW_RECHECK_MS)
     }
   } finally {
     check.isRunning = false
@@ -538,9 +575,14 @@ function refreshSoon($: EngineInterface): void {
 }
 
 function refreshLater($: EngineInterface, ms: number): void {
-  $.clock.after(ms, () => {
+  check.cancelLater?.()
+
+  const timer = $.clock.after(ms, () => {
+    check.cancelLater = null
     void refresh($).catch(() => undefined)
   })
+
+  check.cancelLater = () => timer.cancel()
 }
 
 function refreshEvery($: EngineInterface): void {
@@ -615,17 +657,18 @@ export const register: Register = (on, options) => {
         return []
       }
 
-      if (deployment.status === 'deploying') {
-        return [<Link href={deployment.runUrl}>Preview deploying</Link>]
-      }
-
-      if (deployment.status === 'failed') {
-        return [<Link href={deployment.runUrl}>Preview failed</Link>]
-      }
-
-      return deployment.links.flatMap((link, index) =>
+      const links = deployment.links.flatMap((link, index) =>
         index === 0 ? [<Link href={link.href}>{link.label}</Link>] : [<Text dimColor> · </Text>, <Link href={link.href}>{link.label}</Link>],
       )
+      const runLabel = previewRunLabel(deployment.status, links.length > 0)
+
+      if (runLabel === null) {
+        return links
+      }
+
+      const run = <Link href={deployment.runUrl}>{runLabel}</Link>
+
+      return links.length === 0 ? [run] : [...links, <Text dimColor> · </Text>, run]
     })()
     const previewText =
       previewParts.length === 0 ? [] : list.length === 0 ? previewParts : [<Text dimColor> · </Text>, ...previewParts]

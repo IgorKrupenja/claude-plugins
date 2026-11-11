@@ -1,6 +1,6 @@
 {
   "name": "status-bar",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "A row above the message box with the session's Linear ticket, its state and Figma frames, the pull request's preview links, and how far the merged change has deployed",
   "author": {
     "name": "Igor Krupenja"
