@@ -29,6 +29,10 @@ It finds the ticket in the pull request title, the branch name or the first Line
 
 `Preview deploying` opens the preview's deploy run on GitHub.
 
+<img src="plugins/status-bar/images/preview-ready.png" width="851" alt="The row once the preview is up: Linear LIQ-5463 Dev In Progress, Preview, Admin">
+
+Once the preview is up, its links take that place.
+
 ## pr-watch
 
 A macOS banner and a dim note in the session when the session's pull request is approved, turns

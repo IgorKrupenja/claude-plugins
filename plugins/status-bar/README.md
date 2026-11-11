@@ -11,6 +11,10 @@ the message box, in every session that works on a ticket.
 
 `Preview deploying` opens the preview's deploy run on GitHub.
 
+<img src="images/preview-ready.png" width="851" alt="The row once the preview is up: Linear LIQ-5463 Dev In Progress, Preview, Admin">
+
+Once the preview is up, its links take that place.
+
 - **Read from what you already write:** the ticket IDs come from the title of the pull request
   the app shows for the session (`feat(api): LIQ-123: ...`, several IDs work too), then the
   current branch's pull request, then the branch name (`liq-123-...`), then the first Linear link
